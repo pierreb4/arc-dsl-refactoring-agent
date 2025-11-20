@@ -61,20 +61,25 @@ git commit -m "docs(plan): update scoring to reflect 100/100 implementation poin
 - ✅ `doc/progress-arcDslRefactoringAgent.md` - Progress tracking
 - ✅ `README.md` - Project documentation
 - ✅ `copilot-instructions.md` - This file
-- ✅ `.gitignore` - Git exclusions
+- ✅ `.gitignore` - Git exclusions (single root-level file)
 - ✅ `.env.example` - Example environment configuration
 - ✅ `requirements.txt` - Python dependencies (if exists)
 
 ### Generated/Temporary Files (IGNORE)
-- ❌ `debug_patch_*.patch` - Debugging patch files
-- ❌ `*.backup.*` - Backup files from refactoring operations
-- ❌ `refactoring_report_*.txt` - Session reports
-- ❌ `refactoring_agent.log` - Debug logs
+- ❌ `code/debug_patch_*.patch` - Debugging patch files
+- ❌ `code/*.backup.*` - Backup files from refactoring operations
+- ❌ `code/refactoring_report_*.txt` - Session reports
+- ❌ `code/refactoring_agent.log` - Debug logs
+- ❌ `code/logger.log` - Additional logs
 - ❌ `*.log` - All log files
 - ❌ `.env` - Actual environment variables (secrets!)
 - ❌ `__pycache__/` - Python bytecode
 - ❌ `.pytest_cache/` - Test cache
 - ❌ `code/arc-dsl/` - Cloned dependency (managed separately)
+- ❌ `code/data/` - Data files
+- ❌ `code/day-*.ipynb` - Course materials (already in doc/)
+- ❌ `code/home_automation_agent/` - Course example
+- ❌ `code/research-agent/` - Course example
 
 ## Project Architecture
 
