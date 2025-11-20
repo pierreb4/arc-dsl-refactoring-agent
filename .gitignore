@@ -46,6 +46,10 @@ refactoring_agent.log
 # Session files
 refactoring_report_*.txt
 
+# Refactoring system generated files
+debug_patch_*.patch
+*.backup.*
+
 # arc-dsl repo (cloned dependency)
 code/arc-dsl/
 

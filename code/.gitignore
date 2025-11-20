@@ -1,0 +1,18 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Logs
+*.log
+
+# Refactoring system generated files
+debug_patch_*.patch
+*.backup.*
+refactoring_report_*.txt
+
+# arc-dsl repo (cloned dependency - managed separately)
+arc-dsl/
