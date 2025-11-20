@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -42,16 +43,23 @@ Thumbs.db
 # Logs
 *.log
 refactoring_agent.log
-
-# Session files
-refactoring_report_*.txt
+logger.log
 
 # Refactoring system generated files
 debug_patch_*.patch
 *.backup.*
+refactoring_report_*.txt
 
-# arc-dsl repo (cloned dependency)
+# arc-dsl repo (cloned dependency - managed separately)
 code/arc-dsl/
+
+# Data files
+code/data/
+
+# Course materials (already in doc/)
+code/day-*.ipynb
+code/home_automation_agent/
+code/research-agent/
 
 # Temporary files
 *.tmp
