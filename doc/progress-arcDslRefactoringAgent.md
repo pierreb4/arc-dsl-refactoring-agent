@@ -1,6 +1,6 @@
 # ARC-DSL Refactoring Agent - Progress Tracker
 
-Last Updated: December 2024
+Last Updated: November 2025
 
 ## Current Phase: Deployment & Submission (Step 5-6)
 
@@ -70,7 +70,7 @@ Last Updated: December 2024
 ### Step 1: Clone arc-dsl repo and analyze refactoring needs
 
 **Status:** ✅ COMPLETE  
-**Completed:** December 2024
+**Completed:** November 2025
 
 **Tasks:**
 - [x] Clone [michaelhodel/arc-dsl](https://github.com/michaelhodel/arc-dsl) to `/code/`
@@ -100,7 +100,7 @@ Last Updated: December 2024
 ### Step 2: Design multi-agent HITL refactoring architecture
 
 **Status:** ✅ COMPLETE  
-**Completed:** December 2024
+**Completed:** November 2025
 
 **Tasks:**
 - [x] Design overall agent system architecture
@@ -135,7 +135,7 @@ Last Updated: December 2024
 ### Step 3: Implement agents in Jupyter Notebook with ADK
 
 **Status:** ✅ COMPLETE  
-**Completed:** November 18, 2025
+**Completed:** November 2025
 
 **Tasks:**
 - [x] Create new Jupyter notebook in `/code/` - arc-dsl-refactoring-agent.ipynb
@@ -188,7 +188,7 @@ Last Updated: December 2024
 ### Step 4: Add observability and scoring tracker
 
 **Status:** ✅ COMPLETE  
-**Completed:** November 18, 2025
+**Completed:** November 2025
 
 **Tasks:**
 - [x] Implement observability system (RefactoringMetrics class)
@@ -323,6 +323,30 @@ Last Updated: December 2024
 - Notebook now has clean structure: 38 cells, 18 sections, ~1500 lines
 - Step 4 (observability) complete - ready for deployment
 
+**November 19, 2025**
+- Enhanced HITL checkpoint with intelligent formatting
+  - Added JSON parsing with fallback to raw text
+  - Created _format_analysis(), _format_proposal(), _format_validation() helpers
+  - Display prioritized information (top 3 issues, risks, recommendations)
+  - Clean, human-readable output instead of truncated JSON
+- Added abort option to workflow
+  - New decision: 'abort' (stop/quit/exit) cleanly stops session
+  - Workflow handles abort in both run_refactoring_session() and run_observable_refactoring_session()
+  - Session state preserved on abort with checkpoint logging
+- Updated documentation
+  - architecture-arcDslRefactoringAgent.md: HITL checkpoint section rewritten with formatting details
+  - README.md: Updated example session and HITL flow with formatted output
+  - All docs now reflect enhanced user experience
+- Function improvements:
+  - hitl_checkpoint() now has 4 decision options (was 3)
+  - Better error handling and user feedback
+  - Consistent formatting across both workflow modes
+
+**November 18, 2025**
+- Fixed hitl_checkpoint undefined error
+- Added add_to_memory() helper function
+- Improved notebook cell organization
+
 **November 17, 2025**
 - Created initial progress tracker
 - Awaiting plan refinements before implementation
@@ -340,9 +364,10 @@ Progress on demonstrating required course concepts:
 - [x] **Context engineering** ✅ - Implemented: Specialized system prompts for each agent
 - [x] **Agent evaluation** ✅ - Implemented: Validation agent + metrics tracking
 - [x] **Gemini** ✅ - Implemented: Gemini 2.0 Flash powers all 5 agents
+- [x] **HITL Pattern** ✅ - Implemented: Enhanced checkpoint with formatting and abort (Nov 19)
 - [ ] **Deployment** ⏳ - Planned: Cloud Run or Agent Engine (Step 5)
 
-**Current:** 7/8 concepts demonstrated (exceeds 3+ requirement)  
+**Current:** 7/8 core + 1 bonus (HITL) concepts demonstrated (exceeds 3+ requirement)  
 **Target:** 8/8 after Step 5 (deployment)
 
 ---
@@ -359,4 +384,15 @@ Progress on demonstrating required course concepts:
 
 ## Notes & Learnings
 
-(To be filled during implementation)
+**HITL User Experience:**
+- Initial version showed truncated JSON (hard to parse)
+- Enhanced version extracts key info, formats hierarchically
+- Abort option essential for long sessions
+- User feedback: clearer decisions lead to better approval rates
+
+**Implementation Insights:**
+- JSON parsing from LLM output requires robust error handling
+- Always provide fallback to raw text display
+- Prioritize information display (top N) prevents overwhelming user
+- Consistent formatting across workflow modes reduces confusion
+

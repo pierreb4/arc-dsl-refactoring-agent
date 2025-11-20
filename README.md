@@ -2,7 +2,7 @@
 
 **Kaggle Agents Intensive Capstone Project - Freestyle Track**
 
-A human-in-the-loop (HITL) multi-agent system that incrementally refactors the [arc-dsl codebase](https://github.com/michaelhodel/arc-dsl) through intelligent analysis, proposal generation, validation, and documentation. This "meta-agent" approach—agents that help refactor and improve code—demonstrates an innovative application of AI agents for software engineering.
+A human-in-the-loop (HITL) multi-agent system that incrementally refactors the [arc-dsl codebase](https://github.com/michaelhodel/arc-dsl) through intelligent analysis, proposal generation, automated testing, and documentation. Features a **two-stage HITL workflow**: review proposals before testing, then commit or rollback based on test results. This "meta-agent" approach—agents that help refactor and improve code—demonstrates an innovative application of AI agents for software engineering.
 
 ## 🎯 Project Overview
 
@@ -15,12 +15,14 @@ The ARC-DSL (Abstraction and Reasoning Corpus Domain Specific Language) codebase
 
 ### The Solution
 
-A multi-agent system with human oversight that:
-1. **Analyzes** code for refactoring opportunities (type issues, function grouping)
-2. **Proposes** incremental, backward-compatible changes
-3. **Validates** proposals through automated testing
-4. **Documents** all changes with migration guides
-5. **Learns** from human approval patterns via Memory Bank
+A multi-agent system with two-stage human oversight that:
+1. **Analyzes** code for refactoring opportunities using MCP professional tools (Rope, Radon, Vulture, Pyrefly)
+2. **Proposes** incremental, backward-compatible changes in structured JSON format
+3. **Reviews** at Checkpoint #1: Human approves/rejects proposal before any changes
+4. **Tests** automatically via pytest if approved, with backup creation
+5. **Reviews** at Checkpoint #2: Human commits or rolls back based on test results
+6. **Documents** all changes with migration guides (if committed)
+7. **Learns** from human approval patterns via Memory Bank
 
 ### Why Agents?
 
@@ -46,22 +48,44 @@ Traditional refactoring tools are rule-based and brittle. Our agent-based approa
     │  ANALYSIS    │  │  REFACTOR    │  │ VALIDATION   │
     │   AGENT      │  │   AGENT      │  │   AGENT      │
     │              │  │              │  │              │
-    │ • Find type  │  │ • Generate   │  │ • Run tests  │
-    │   issues     │  │   proposals  │  │ • Check      │
-    │ • Group      │  │ • Ensure     │  │   backwards  │
-    │   functions  │  │   compat     │  │   compat     │
+    │ • Find type  │  │ • Generate   │  │ • Check      │
+    │   issues     │  │   proposals  │  │   backwards  │
+    │ • Group      │  │ • Ensure     │  │   compat     │
+    │   functions  │  │   compat     │  │ • Assess risk│
+    │ • MCP tools  │  │ • JSON fmt   │  │              │
     └──────────────┘  └──────────────┘  └──────────────┘
             │               │               │
             └───────────────┼───────────────┘
                             ▼
                    ┌─────────────────┐
-                   │  HITL APPROVAL  │
-                   │   CHECKPOINT    │
+                   │ CHECKPOINT #1   │
+                   │ Review Proposal │
                    │                 │
-                   │ Human decides:  │
-                   │ Approve/Reject  │
+                   │ Approve/Reject/ │
+                   │ Skip/Abort      │
+                   └─────────────────┘
+                            │ (if approved)
+                            ▼
+                   ┌─────────────────┐
+                   │  Apply Changes  │
+                   │  Create Backup  │
                    └─────────────────┘
                             │
+                            ▼
+                   ┌─────────────────┐
+                   │  Run pytest on  │
+                   │ arc-dsl/tests.py│
+                   └─────────────────┘
+                            │
+                            ▼
+                   ┌─────────────────┐
+                   │ CHECKPOINT #2   │
+                   │ Review Tests    │
+                   │                 │
+                   │ Commit/Rollback/│
+                   │ Abort           │
+                   └─────────────────┘
+                            │ (if committed)
                             ▼
                   ┌──────────────────┐
                   │ DOCUMENTATION    │
@@ -87,12 +111,28 @@ Traditional refactoring tools are rule-based and brittle. Our agent-based approa
 
 ```python
 class RefactoringTools:
+    # Basic file operations
     read_file(file_path)           # Load source code
-    write_file(file_path, content) # Save refactored code (with backup)
-    analyze_type_usage(file_path)  # Find isinstance checks and Union types
+    write_file(file_path, content) # Save refactored code (with timestamped backup)
+    
+    # MCP-enhanced analysis (uses mcp-python-refactoring package)
+    analyze_type_usage(file_path)  # Find isinstance checks & Union types
+                                   # Falls back to MCP: Rope, Radon, Vulture, Pyrefly
+    
+    # Code structure analysis
     find_function_signatures(...)  # Identify functions with identical signatures
+    
+    # Testing (used by two-stage HITL workflow)
     run_tests(test_file)           # Execute pytest suite
 ```
+
+**MCP Integration**: Analysis Agent uses professional refactoring tools via MCP:
+- **Rope**: Refactoring analysis
+- **Radon**: Complexity metrics (cyclomatic, maintainability index)
+- **Vulture**: Dead code detection
+- **Pyrefly**: Type checking
+- **McCabe**: Complexity analysis
+- **Complexipy**: Advanced complexity metrics
 
 ### Session State & Memory
 
@@ -136,40 +176,76 @@ echo "GOOGLE_API_KEY=your_api_key_here" > code/.env
    - Cell 13: Run the system
 
 3. **Interact with HITL checkpoints**:
-   - Review each proposal summary
-   - Enter `approve`, `skip`, or `reject`
+   - Review formatted analysis, proposal, and validation
+   - Choose: `approve`, `skip`, `reject`, or `abort`
    - Provide feedback for rejected proposals
-   - System learns from your decisions
+   - System learns from your decisions and continues
+   - Abort cleanly stops the workflow at any point
 
 ### Example Session
 
 ```
-📊 ANALYSIS SUMMARY:
-  - isinstance checks found: 47
-  - Union types found: 4
-  - Groupable function signatures: 12
+📊 ANALYSIS SUMMARY
+--------------------------------------------------------------------------------
+  🔍 Issues Found: 8
+     1. [HIGH] type_ambiguity at line 45
+        Union[Grid, np.ndarray] creates type confusion...
+     2. [MEDIUM] isinstance_check at line 127
+        Multiple isinstance checks indicate need for type refinement...
+  
+  📦 Function Grouping Opportunities: 3
+     1. 12 functions with signature: (Grid) -> Grid
 
-🔨 REFACTORING PROPOSAL:
-Replace Union[Grid, np.ndarray] with dedicated Grid type...
+  💡 Top Recommendations:
+     1. [Priority 1, Risk: low] Replace Union types with dedicated classes...
 
-✅ VALIDATION RESULTS:
-All tests pass. Backward compatible via type aliases...
+================================================================================
+🔨 REFACTORING PROPOSAL
+--------------------------------------------------------------------------------
+  🎯 Target: Eliminate Union[Grid, np.ndarray] type ambiguity
+  📋 Strategy: Create dedicated Grid class with np.ndarray wrapper...
+  📝 Proposed Changes: 1 file(s)
+     1. arc_types.py: ~45 lines
+        Before: Grid = Union[List[List[int]], np.ndarray]...
+        After:  class Grid: def __init__(self, data: np.ndarray)...
 
-Decision [approve/skip/reject]: approve
-✅ APPROVED - Will proceed with refactoring
+================================================================================
+✅ VALIDATION RESULTS
+--------------------------------------------------------------------------------
+  ✅ Overall Status: PASS
+  ✅ Backward Compatible: True
+  
+  ⚠️ Risks Identified: 2
+     1. Existing code using isinstance(x, np.ndarray) needs wrapper...
+     2. Performance impact minimal but requires testing...
+
+================================================================================
+DECISION OPTIONS:
+  • approve (a/yes/y) - Apply this refactoring
+  • skip (s)          - Skip this file, continue to next
+  • reject (r/no/n)   - Reject this refactoring
+  • abort (stop/quit) - Stop the entire workflow
+================================================================================
+
+🤔 Your decision: approve
+
+✅ Refactoring APPROVED
+📝 Generating documentation...
+✓ Documentation generated
 ```
 
 ## 📊 Key Concepts Demonstrated
 
 This project demonstrates **7 out of 8** core course concepts:
 
-- ✅ **Multi-agent system**: 5 specialized agents collaborating
-- ✅ **Custom tools**: 5 tools for code analysis and transformation
-- ✅ **Sessions & Memory**: Session state + Memory Bank for learning
-- ✅ **Observability**: Logging, tracing, and metrics tracking
-- ✅ **Context engineering**: Specialized system prompts per agent
-- ✅ **Agent evaluation**: Validation agent + metrics tracking
-- ✅ **Gemini**: Gemini 2.0 Flash powers all agents
+- ✅ **Multi-agent system**: 5 specialized agents (Coordinator, Analysis, Refactor, Validation, Documentation) with sequential workflow
+- ✅ **Tools - Custom**: 5 custom tools (read_file, write_file, analyze_type_usage, find_function_signatures, run_tests)
+- ✅ **Tools - MCP**: mcp-python-refactoring integration (Rope, Radon, Vulture, Pyrefly, McCabe, Complexipy)
+- ✅ **Sessions & Memory**: session_state dict tracking + memory_bank for learning human preferences
+- ✅ **Observability**: RefactoringMetrics class + file/console logging with DEBUG/INFO levels
+- ✅ **Context engineering**: Specialized system prompts per agent role
+- ✅ **Agent evaluation**: Automated pytest testing + two-stage HITL validation + metrics
+- ✅ **Gemini**: Gemini 2.5 Flash Lite powers all 5 agents
 - ⏳ **Deployment**: Cloud Run (planned)
 
 ## 📈 Results & Metrics
@@ -212,22 +288,81 @@ result = coordinator.process_file("arc-dsl/arc_types.py")
 # Returns: {analysis, proposal, validation, metrics}
 ```
 
-### HITL Approval Flow
+### Two-Stage HITL Workflow
 
+**Stage 1: Checkpoint #1 - Review Proposal**
 ```python
 def hitl_checkpoint(result):
-    # Display proposal summary
-    print(f"Proposal: {result['proposal'][:500]}...")
-    print(f"Validation: {result['validation'][:500]}...")
+    """First checkpoint: Review agent proposal before testing"""
     
-    # Get human decision
-    decision = input("Decision [approve/skip/reject]: ")
+    # Display formatted sections (parses JSON, extracts key info)
+    print("📊 ANALYSIS SUMMARY")
+    print(_format_analysis(result['analysis']))  # Issues, grouping, recommendations
     
-    # Store in memory bank for learning
-    store_memory(decision, context=result['file'])
+    print("🔨 REFACTORING PROPOSAL")
+    print(_format_proposal(result['proposal']))   # Target, strategy, changes
     
-    return {'status': decision, 'feedback': feedback}
+    print("✅ VALIDATION RESULTS")
+    print(_format_validation(result['validation']))  # Status, risks, compatibility
+    
+    # Present clear decision options
+    print("DECISION OPTIONS:")
+    print("  • approve (a/yes/y) - Apply this refactoring and run tests")
+    print("  • skip (s)          - Skip this file, continue to next")
+    print("  • reject (r/no/n)   - Reject this refactoring")
+    print("  • abort (stop/quit) - Stop the entire workflow")
+    
+    decision = input("Your decision: ").strip().lower()
+    
+    if decision in ['approve', 'a', 'yes', 'y']:
+        store_memory('approval', context=result['file'])
+        return {'status': 'approve'}  # Proceed to Stage 2
+    # ... handle skip/reject/abort
 ```
+
+**Stage 2: Apply, Test, and Checkpoint #2 - Commit/Rollback**
+```python
+# If approved at Checkpoint #1:
+
+# 1. Apply refactoring and create backup
+backup_path = write_file(file_path, refactored_code)  # Auto-creates timestamped backup
+
+# 2. Run automated tests
+test_result = subprocess.run(['python', '-m', 'pytest', 'arc-dsl/tests.py', ...])
+test_passed = (test_result.returncode == 0)
+
+# 3. Second checkpoint: Show test results
+print("👤 CHECKPOINT #2: COMMIT OR ROLLBACK")
+print(f"🧪 Test Result: {'✅ PASSED' if test_passed else '❌ FAILED'}")
+print(f"💾 Backup: {backup_path}")
+
+print("DECISION OPTIONS:")
+if test_passed:
+    print("  • commit (c/yes/y)  - Keep the changes (tests passed!)")
+    print("  • rollback (r/no/n) - Restore backup (despite passing tests)")
+else:
+    print("  • commit (c/yes/y)  - Keep the changes (despite test failures)")
+    print("  • rollback (r/no/n) - Restore backup (recommended - tests failed!)")
+print("  • abort (stop/quit) - Stop the entire workflow")
+
+commit_decision = input("Your decision: ").strip().lower()
+
+if commit_decision in ['rollback', 'r', 'no', 'n']:
+    subprocess.run(['cp', backup_path, file_path])  # Restore original
+    print("✅ Original file restored")
+elif commit_decision in ['commit', 'c', 'yes', 'y']:
+    print("✅ Changes committed")
+    # Generate documentation, update metrics, etc.
+```
+
+**Key Features:**
+- **Two Decision Points**: Review before testing, commit after seeing results
+- **Automated Testing**: pytest runs automatically between checkpoints
+- **Safe Rollback**: Timestamped backups enable instant restore
+- **Test Transparency**: See exact pass/fail before committing
+- **Smart Formatting**: Parses JSON, shows prioritized info (top 3 issues/risks)
+- **Abort Anywhere**: Clean exit at either checkpoint
+- **Memory Learning**: Stores all decisions for pattern recognition
 
 ### Observability & Metrics
 

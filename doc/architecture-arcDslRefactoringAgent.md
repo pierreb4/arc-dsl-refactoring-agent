@@ -440,100 +440,177 @@ Output format:
 
 ## HITL Approval Checkpoint Interface
 
-The human operator approves/rejects proposals through an interactive Jupyter interface:
+The human operator approves/rejects/aborts proposals through an interactive Jupyter interface with formatted, human-readable output:
 
-### Interface Design (ipywidgets)
+### Key Features
+
+**Intelligent Output Formatting:**
+- Automatically parses JSON from agent responses
+- Falls back to truncated raw text if JSON parsing fails
+- Extracts and highlights key information (issues, recommendations, risks)
+- Presents data in structured, scannable format
+
+**Decision Options:**
+- `approve` (a/yes/y) - Apply this refactoring
+- `skip` (s) - Skip this file, continue to next
+- `reject` (r/no/n) - Reject this refactoring with optional feedback
+- `abort` (stop/quit) - Cleanly stop the entire workflow
+
+**Enhanced User Experience:**
+- Color-coded sections (📊 Analysis, 🔨 Proposal, ✅ Validation)
+- Prioritized display (top 3 issues, risks, recommendations)
+- Compact signatures for function grouping
+- Before/after snippets for proposed changes
+
+### Implementation
+
+```python
+def hitl_checkpoint(result: Dict) -> Dict:
+    """Human-in-the-loop approval checkpoint with formatted display"""
+    
+    # Display formatted sections
+    print("📊 ANALYSIS SUMMARY")
+    print(_format_analysis(result['analysis']))  # Parses and formats JSON
+    
+    print("🔨 REFACTORING PROPOSAL") 
+    print(_format_proposal(result['proposal']))  # Shows changes, strategy
+    
+    print("✅ VALIDATION RESULTS")
+    print(_format_validation(result['validation']))  # Highlights risks, compatibility
+    
+    # Present decision options
+    print("DECISION OPTIONS:")
+    print("  • approve - Apply refactoring")
+    print("  • skip    - Skip this file")
+    print("  • reject  - Reject with feedback")
+    print("  • abort   - Stop entire workflow")
+    
+    decision = input("Your decision: ").strip().lower()
+    
+    # Handle abort
+    if decision in ['abort', 'stop', 'quit', 'exit']:
+        return {'status': 'abort', 'checkpoint': {...}}
+    
+    # Handle approve/skip/reject with memory storage
+    # ...
+```
+
+### Helper Functions
+
+**JSON Parsing with Fallback:**
+```python
+def _parse_agent_output(text: str) -> Dict:
+    """Try to parse agent output as JSON, return formatted summary if fails"""
+    try:
+        # Extract JSON from markdown code blocks or parse directly
+        if '```json' in text:
+            json_text = extract_from_markdown(text)
+            return json.loads(json_text)
+        return json.loads(text)
+    except:
+        return {'raw_output': text}  # Fallback to raw text
+```
+
+**Analysis Formatter:**
+```python
+def _format_analysis(analysis: str) -> str:
+    """Format analysis output in human-readable way"""
+    parsed = _parse_agent_output(analysis)
+    
+    lines = []
+    lines.append(f"  🔍 Issues Found: {len(parsed['issues'])}")
+    for issue in parsed['issues'][:3]:  # Top 3
+        lines.append(f"     [{issue['severity']}] {issue['type']} at {issue['location']}")
+    
+    lines.append(f"  📦 Grouping Opportunities: {len(parsed['grouping_opportunities'])}")
+    lines.append(f"  💡 Top Recommendations: ...")
+    
+    return '\n'.join(lines)
+```
+
+**Proposal Formatter:**
+```python
+def _format_proposal(proposal: str) -> str:
+    """Format refactoring proposal in human-readable way"""
+    parsed = _parse_agent_output(proposal)
+    
+    lines = []
+    lines.append(f"  🎯 Target: {parsed['target']}")
+    lines.append(f"  📋 Strategy: {parsed['strategy'][:200]}...")
+    lines.append(f"  📝 Proposed Changes: {len(parsed['changes'])} file(s)")
+    
+    for change in parsed['changes'][:3]:  # Show first 3
+        lines.append(f"     {change['file']}: ~{change['lines_changed']} lines")
+        lines.append(f"        Before: {change['before'][:60]}...")
+        lines.append(f"        After:  {change['after'][:60]}...")
+    
+    return '\n'.join(lines)
+```
+
+**Validation Formatter:**
+```python
+def _format_validation(validation: str) -> str:
+    """Format validation output in human-readable way"""
+    parsed = _parse_agent_output(validation)
+    
+    lines = []
+    status = parsed['overall_status']
+    icon = '✅' if status == 'PASS' else '⚠️'
+    lines.append(f"  {icon} Overall Status: {status}")
+    
+    vr = parsed['validation_results']
+    compat_icon = '✅' if vr['backward_compatible'] else '❌'
+    lines.append(f"  {compat_icon} Backward Compatible: {vr['backward_compatible']}")
+    
+    lines.append(f"  ⚠️ Risks: {len(vr['risks'])}")
+    for risk in vr['risks'][:3]:  # Top 3
+        lines.append(f"     - {risk[:70]}...")
+    
+    return '\n'.join(lines)
+```
+
+### Workflow Abort Handling
+
+```python
+def run_refactoring_session():
+    """Execute workflow with abort support"""
+    for file_path in session_state['files_to_process']:
+        result = coordinator.process_file(file_path)
+        decision = hitl_checkpoint(result)
+        
+        # Handle abort
+        if decision['status'] == 'abort':
+            print("🛑 WORKFLOW ABORTED BY USER")
+            print(f"Files processed: {len(completed)}/{len(total)}")
+            session_state['checkpoints'].append(decision['checkpoint'])
+            break  # Clean exit
+        
+        # Handle other decisions (approve/skip/reject)
+        # ...
+```
+
+### Alternative: ipywidgets Interface (Future Enhancement)
+
+For richer interactivity (not currently implemented):
 
 ```python
 from ipywidgets import Button, VBox, HTML, Textarea
 
 class HITLCheckpoint:
-    def __init__(self, proposal, validation):
-        self.proposal = proposal
-        self.validation = validation
-        self.decision = None
-        
     def display(self):
-        # Header
-        header = HTML(f"<h3>Refactoring Proposal: {self.proposal['proposal_id']}</h3>")
-        
-        # Proposal summary
-        summary = HTML(f"""
-        <b>Target:</b> {self.proposal['target']}<br>
-        <b>Strategy:</b> {self.proposal['strategy']}<br>
-        <b>Files affected:</b> {len(self.proposal['changes'])}<br>
-        <b>Estimated time:</b> {self.proposal['estimated_time']}
-        """)
-        
-        # Before/After diff
-        diff_html = self._render_diff()
-        
-        # Validation results
-        validation_html = HTML(f"""
-        <h4>Validation Results</h4>
-        <b>Tests:</b> {self.validation['unit_tests']['passed']} passed, 
-                      {self.validation['unit_tests']['failed']} failed<br>
-        <b>Type checking:</b> {self.validation['type_checking']['errors']} errors<br>
-        <b>Performance:</b> {self.validation['performance']['improvement']}<br>
-        <b>Status:</b> <span style="color: green">{self.validation['overall_status']}</span>
-        """)
-        
-        # Feedback textarea
-        feedback = Textarea(
-            placeholder='Optional: Provide feedback or modification requests',
-            layout={'width': '100%', 'height': '100px'}
-        )
-        
-        # Action buttons
+        # Interactive buttons with real-time feedback
         approve_btn = Button(description='✅ Approve', button_style='success')
-        modify_btn = Button(description='✏️ Request Changes', button_style='warning')
+        skip_btn = Button(description='⏭️ Skip', button_style='info')
         reject_btn = Button(description='❌ Reject', button_style='danger')
+        abort_btn = Button(description='🛑 Abort', button_style='warning')
         
-        approve_btn.on_click(lambda b: self._on_approve(feedback.value))
-        modify_btn.on_click(lambda b: self._on_modify(feedback.value))
-        reject_btn.on_click(lambda b: self._on_reject(feedback.value))
-        
-        # Layout
-        display(VBox([
-            header,
-            summary,
-            diff_html,
-            validation_html,
-            feedback,
-            HBox([approve_btn, modify_btn, reject_btn])
-        ]))
-        
-        # Wait for decision
-        while self.decision is None:
-            time.sleep(0.1)
-        
-        return self.decision
-    
-    def _on_approve(self, feedback):
-        self.decision = {
-            'status': 'approved',
-            'feedback': feedback,
-            'timestamp': datetime.now()
-        }
-    
-    def _on_reject(self, reason):
-        self.decision = {
-            'status': 'rejected',
-            'reason': reason,
-            'timestamp': datetime.now()
-        }
-    
-    def _on_modify(self, modifications):
-        self.decision = {
-            'status': 'modify',
-            'modifications': modifications,
-            'timestamp': datetime.now()
-        }
+        # Event handlers update self.decision
+        # ...
 ```
 
-### Alternative: Simple input() Interface
+### Simple input() Interface (Current Implementation)
 
-For environments without ipywidgets:
+Used for maximum compatibility across Jupyter environments:
 
 ```python
 def simple_hitl_checkpoint(proposal, validation):
