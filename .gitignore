@@ -63,11 +63,6 @@ code/arc-dsl/*.backup.*
 # Data files
 code/data/
 
-# Course materials (already in doc/)
-code/day-*.ipynb
-code/home_automation_agent/
-code/research-agent/
-
 # Temporary files
 *.tmp
 *.bak
