@@ -51,7 +51,14 @@ debug_patch_*.patch
 refactoring_report_*.txt
 
 # arc-dsl repo (cloned dependency - managed separately)
+# Note: we clone and modify this repo, but don't track most changes
 code/arc-dsl/
+# However, track specific files we modify through refactoring
+!code/arc-dsl/*.py
+!code/arc-dsl/tests.py
+# Ignore Python cache and backups in arc-dsl
+code/arc-dsl/__pycache__/
+code/arc-dsl/*.backup.*
 
 # Data files
 code/data/
