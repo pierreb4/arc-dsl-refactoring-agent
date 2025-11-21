@@ -232,11 +232,18 @@ git reset --hard HEAD~1  # Discard changes (dangerous!)
 **Symptoms**: `google.genai.errors.ServerError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}`
 
 **Solution**: ✅ Automatic retry is now enabled!
-- All agents use Gemini wrapper with HttpRetryOptions
+- All agents use manual retry logic with HttpRetryOptions configuration
 - Automatically retries on: 429, 500, 503, 504 errors
-- Exponential backoff: 1s → 7s → 49s → 343s → 2401s
+- Exponential backoff: 1s → 7s → 49s → 343s → 2401s (delay = initial_delay * exp_base^attempt)
 - Maximum 5 retry attempts
+- Console shows retry progress (e.g., "⚠️ Analysis Agent: HTTP error on attempt 2/5, Retrying in 7.0s...")
 - No manual intervention needed - errors are handled automatically
+
+**Technical details:**
+- Uses `retry_config = types.HttpRetryOptions(attempts=5, exp_base=7, initial_delay=1, http_status_codes=[429, 500, 503, 504])`
+- RefactoringAgent.call() implements retry loop with exponential backoff
+- ObservableRefactoringAgent inherits retry logic and adds logging/metrics
+- Compatible with `client.models.generate_content()` API (not ADK LlmAgent)
 
 ### Issue: Patch won't apply
 **Symptoms**: "File to patch: No file found--skip this patch?"
