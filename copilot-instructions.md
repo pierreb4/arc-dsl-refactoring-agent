@@ -118,16 +118,18 @@ git commit -m "docs(plan): update scoring to reflect 100/100 implementation poin
 - **Session State**: Tracks refactoring progress across files
 - **Memory Bank**: Stores HITL decisions and patch failure lessons for agent learning
 - **Observability**: RefactoringMetrics class + logging (DEBUG to file, INFO to console)
-- **Patch System**: Uses unified diff format with `-p0` (exact path matching)
+- **Patch System**: Uses unified diff format with **`-p1`** (strips `a/` and `b/` prefixes from Git-style diffs)
 
 ## Critical Implementation Details
 
 ### Patch Format Requirements
 
+**CRITICAL: We use Git-style unified diffs with `-p1` flag**
+
 **CORRECT FORMAT** (what agents must generate):
 ```diff
---- arc-dsl/arc_types.py
-+++ arc-dsl/arc_types.py
+--- a/arc-dsl/arc_types.py
++++ b/arc-dsl/arc_types.py
 @@ -20,7 +20,7 @@
  Objects = FrozenSet[Object]
  Indices = FrozenSet[IntegerTuple]
@@ -139,10 +141,27 @@ git commit -m "docs(plan): update scoring to reflect 100/100 implementation poin
 ```
 
 **Key Requirements:**
-- No `a/` and `b/` prefixes (we use `-p0` flag)
-- Exact paths relative to workspace (e.g., `arc-dsl/arc_types.py`)
+- **MUST use `a/` and `b/` prefixes** (standard Git format: `--- a/file` and `+++ b/file`)
+- Paths after prefix: `arc-dsl/arc_types.py` (HYPHEN not underscore!)
+- Applied with `patch -p1` command (strips the `a/` and `b/` prefixes)
 - 3+ lines of exact context before and after changes
 - Context must match file VERBATIM (no paraphrasing!)
+
+**Why `-p1`?**
+- The patch header is `--- a/arc-dsl/constants.py`
+- The `-p1` flag strips **1 directory level** from the path
+- This removes the `a/` prefix, leaving `arc-dsl/constants.py`
+- The file is then found in the workspace at `code/arc-dsl/constants.py`
+
+**WRONG: Using `-p0`**
+- Would try to find a file literally named `a/arc-dsl/constants.py`
+- This file doesn't exist → "No file found--skip this patch?" error
+- We previously had this bug and fixed it!
+
+**Agent Instructions:**
+- Refactor Agent system prompt explicitly states: "can be applied with `patch -p1`"
+- All patches MUST follow Git unified diff format
+- NO exceptions or variations
 
 ### Memory Bank Lessons
 
