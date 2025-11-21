@@ -228,6 +228,16 @@ git reset --hard HEAD~1  # Discard changes (dangerous!)
 
 ## Common Issues & Solutions
 
+### Issue: 503 UNAVAILABLE or other HTTP errors
+**Symptoms**: `google.genai.errors.ServerError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}`
+
+**Solution**: ✅ Automatic retry is now enabled!
+- All agents use Gemini wrapper with HttpRetryOptions
+- Automatically retries on: 429, 500, 503, 504 errors
+- Exponential backoff: 1s → 7s → 49s → 343s → 2401s
+- Maximum 5 retry attempts
+- No manual intervention needed - errors are handled automatically
+
 ### Issue: Patch won't apply
 **Symptoms**: "File to patch: No file found--skip this patch?"
 
