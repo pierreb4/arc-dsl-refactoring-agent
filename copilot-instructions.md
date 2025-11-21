@@ -163,19 +163,78 @@ git commit -m "docs(plan): update scoring to reflect 100/100 implementation poin
 - All patches MUST follow Git unified diff format
 - NO exceptions or variations
 
-### Memory Bank Lessons
+### Memory Bank & Agent Learning Loop
 
-When patches fail, the system records:
+**CRITICAL: The system implements automatic learning from patch failures!**
+
+#### How the Feedback Loop Works:
+
+**1. Capture Failures** (when patch fails - lines 2645-2668):
 ```python
 memory_bank[f"patch_failure_{timestamp}"] = {
+    'timestamp': datetime.now().isoformat(),
     'file': file_path,
+    'patch_description': patch_desc,
     'error': error_msg,
-    'patch_content': patch_content,
-    'lesson': 'Agents must read actual file contents carefully and use exact variable names.'
+    'patch_content': patch_content[:500],
+    'lesson': lesson  # Auto-generated based on error type
 }
 ```
 
-These lessons are fed back to agents in subsequent attempts.
+**Common Error Detection:**
+- If `arc_dsl/` in patch → Lesson: "Use arc-dsl/ (HYPHEN) not arc_dsl/ (UNDERSCORE)"
+- Otherwise → Lesson: "Read actual file contents, use exact variable names, match line-by-line"
+
+**2. Retrieve Lessons** (before generating proposal - lines 2031-2039):
+```python
+# Collect last 3 patch failures from Memory Bank
+patch_failures = [v for k, v in memory_bank.items() if k.startswith('patch_failure_')]
+lessons_text = "\n\nPREVIOUS PATCH FAILURES (learn from these):\n"
+for failure in patch_failures[-3:]:
+    lessons_text += f"- File: {failure['file']}\n"
+    lessons_text += f"  Error: {failure['error']}\n"
+    lessons_text += f"  Lesson: {failure['lesson']}\n"
+```
+
+**3. Teach Agent** (in refactor_prompt - lines 2057-2082):
+```python
+refactor_prompt = f"""Based on the analysis, generate a PATCH-BASED refactoring proposal.
+
+Analysis Results:
+{analysis_result}
+
+ACTUAL FILE CONTENT (for exact context matching):
+{file_content[:2000]}
+
+Memory (human preferences):
+{json.dumps(memory_bank['preferences'], indent=2)}
+{lessons_text}  # ← Patch failures included here
+{human_feedback}  # ← Rejections and rollbacks too
+
+CRITICAL REQUIREMENTS:
+1. Read the ACTUAL FILE CONTENT above - use EXACT variable names...
+2. Your patch context must match the file EXACTLY...
+"""
+```
+
+**4. Agent Learns** (on next iteration):
+- Sees previous failures and error messages
+- Understands what went wrong
+- Adjusts patch generation approach
+- Avoids repeating same mistakes
+
+#### Memory Bank Categories:
+- `approval_patterns` - Successful refactorings
+- `rejection_reasons` - Human rejected proposals (with reasons)
+- `rollbacks` - Approved but later rolled back (with test results)
+- `patch_failure_*` - Failed patches (malformed, wrong paths, context mismatches)
+
+#### What Gets Learned:
+- ✅ Patch format errors (malformed diffs, missing context)
+- ✅ Path errors (arc_dsl/ vs arc-dsl/, wrong directory prefixes)
+- ✅ Context mismatches (hallucinated variable names, paraphrased code)
+- ✅ Human preferences (from rejections and rollbacks)
+- ✅ Test failures (which changes break compatibility)
 
 ### Test Baseline
 
