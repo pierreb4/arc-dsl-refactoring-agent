@@ -1,5 +1,39 @@
 # Copilot Instructions for ARC-DSL Refactoring Agent System
 
+## ⚠️ CRITICAL: Maintaining This Document
+
+**This file is the source of truth for project guidelines.** When receiving interactive instructions:
+
+1. **Compare** interactive instruction with documented guidelines in this file
+2. **Evaluate** if the instruction represents:
+   - A one-time request (execute as-is)
+   - A new pattern/guideline (should be documented)
+   - A correction to existing guideline (update needed)
+   - A conflict with existing guideline (clarification needed)
+
+3. **Ask permission** before updating this file:
+   ```
+   "This instruction suggests [X], which differs from/adds to the current 
+   guidelines in copilot-instructions.md. Should I:
+   a) Execute this once without updating documentation
+   b) Update copilot-instructions.md to include this guideline
+   c) Replace existing guideline [Y] with this new approach"
+   ```
+
+4. **Document systematically** when updating (see "Systematic Documentation Update Guidelines" section)
+
+**Examples:**
+
+❌ **Don't silently diverge:**
+- User: "Don't add doc cells, put info in existing markdown"
+- ❌ Execute and forget
+- ✅ Execute AND ask: "Should I add this to copilot-instructions.md as a notebook organization guideline?"
+
+✅ **Do evaluate and confirm:**
+- User: "Use -p1 for patches, not -p0"
+- ✅ Recognize this corrects documented guideline
+- ✅ Ask: "This fixes the patch flag. Should I update the 'Patch Format Requirements' section?"
+
 ## Project Overview
 
 This is a **Freestyle Capstone Project** for the AI Agents Intensive course - a human-in-the-loop (HITL) multi-agent system that performs incremental refactoring of the ARC-DSL codebase using patch-based transformations.
@@ -8,12 +42,31 @@ This is a **Freestyle Capstone Project** for the AI Agents Intensive course - a 
 
 ## Git Workflow Guidelines
 
-### When to Save to Git
+### ⚠️ CRITICAL: Always Commit to Git
 
-**ALWAYS commit after:**
-- ✅ Completing a major feature or system component
+**Git is your safety net.** Uncommitted work can be permanently lost via `git restore` or system crashes.
+
+**MANDATORY - Commit immediately after:**
+- ✅ Completing a major feature or system component (e.g., new notebook section)
 - ✅ Successfully passing all tests
 - ✅ Fixing critical bugs that restore functionality
+- ✅ Adding 50+ lines of new code
+- ✅ Creating new tools or agent definitions
+- ✅ Any work that took >10 minutes to create
+
+**Before risky operations:**
+- ⚠️ ALWAYS commit before attempting experimental fixes
+- ⚠️ ALWAYS commit before bulk file modifications
+- ⚠️ ALWAYS commit before regex-based replacements
+
+**Example commit workflow:**
+```bash
+cd "/Users/pierre/Library/CloudStorage/GoogleDrive-pierre@baume.org/My Drive/AI Agents Intensive"
+git add code/arc-dsl-refactoring-agent.ipynb
+git commit -m "feat(phase1): add type annotation system with HITL workflow"
+```
+
+### When to Save to Git
 - ✅ Adding new agents or tools to the system
 - ✅ Updating documentation (README, plan, progress)
 - ✅ Before starting risky refactoring operations
@@ -96,6 +149,24 @@ git commit -m "docs(plan): update scoring to reflect 100/100 implementation poin
    - Learns from previous patch failures in Memory Bank
 4. **Validation Agent** - Tests and validates changes
 5. **Documentation Agent** - Updates documentation
+
+### Phase 1: Type Annotation System (Section 21)
+
+**Purpose:** Demonstrate incremental type annotation of 400+ solvers using specialized agent.
+
+**Components:**
+- Type Annotation Agent with Grid/Object/Indices/Integer type system
+- `analyze_solver_types_tool()` - Wraps `analyze_solver_types.py` CLI
+- `get_annotation_progress_tool()` - Tracks coverage via regex
+- `get_next_batch_tool()` - Returns unannotated solvers in line range
+- `run_type_annotation_test()` - HITL workflow with approve/refine/skip/abort
+
+**Test Results (10 solvers):**
+- ✅ 8 approved, 1 refined, 2 skipped
+- ⚠️ Critical bugs discovered: regex pattern destroyed file, agent hallucinated code
+- 🔧 Fixes pending: regex, parser, agent constraints
+
+**Status:** Testing phase - bugs identified, fixes in progress
 
 ### Two-Stage HITL Workflow
 
@@ -399,14 +470,104 @@ rm code/*.backup.*
 rm code/refactoring_report_*.txt
 ```
 
+## Systematic Documentation Update Guidelines
+
+**CRITICAL:** Keep all documentation files synchronized when making changes to the system.
+
+### Documentation Files to Update
+
+1. **copilot-instructions.md** (this file)
+   - When: Architecture changes, new components, critical bugs, workflow changes
+   - Sections: Project Architecture, Critical Implementation Details, Common Issues
+   - Keep: Under 500 lines, focused on actionable guidance
+
+2. **doc/progress-arcDslRefactoringAgent.md**
+   - When: Phase completions, test results, bug discoveries, fixes applied
+   - Sections: Current Phase, Progress Overview, Scoring Tracker, detailed phase sections
+   - Keep: Timestamped updates, specific metrics (percentages, counts)
+
+3. **doc/plan-arcDslRefactoringAgent.prompt.md**
+   - When: Scoring changes, implementation status updates, checklist completions
+   - Sections: Further Considerations (HITL, scoring), Capstone Requirements
+   - Keep: High-level plan, don't add implementation details
+
+4. **doc/type-annotation-system.md**
+   - When: Phase 1 changes, tool updates, workflow modifications
+   - Sections: Architecture, Components, Usage, Test Results
+   - Keep: Technical details for type annotation system specifically
+
+5. **README.md** (project root)
+   - When: Major features complete, architecture changes, setup changes
+   - Sections: Overview, Architecture, Setup, Usage, Key Concepts
+   - Keep: User-facing, high-level, assume no prior knowledge
+
+6. **Jupyter Notebook - Section 20 "About This Notebook"**
+   - When: Phase completions, test results, next steps changes
+   - Sections: Notebook Structure, Phase Results, Resources, Next Steps
+   - Keep: Concise summary, links to detailed docs
+
+### Update Workflow
+
+**When completing a feature/phase:**
+1. Update `doc/progress-arcDslRefactoringAgent.md` with results and metrics
+2. Update relevant section in `copilot-instructions.md` if architecture changed
+3. Update notebook Section 20 with high-level summary and next steps
+4. Update `doc/plan-arcDslRefactoringAgent.prompt.md` scoring/checklist if applicable
+5. Update specialized doc (e.g., `type-annotation-system.md`) if feature-specific
+6. Update `README.md` only if user-facing functionality changed
+
+**When discovering bugs:**
+1. Document in `doc/progress-arcDslRefactoringAgent.md` (Issues Discovered section)
+2. Add to "Common Issues & Solutions" in `copilot-instructions.md` if critical
+3. Update notebook Section 20 if affects next steps
+
+**When fixing bugs:**
+1. Update `doc/progress-arcDslRefactoringAgent.md` (Fixes Applied/Pending sections)
+2. Remove from "Common Issues" in `copilot-instructions.md` if resolved
+3. Update notebook Section 20 to reflect current status
+
+**After major milestones:**
+1. Run through all 6 documentation files to ensure consistency
+2. Check that percentages, counts, and statuses match across files
+3. Verify links and references are still valid
+4. Update "Last Updated" timestamps
+
+### Documentation Quality Standards
+
+✅ **Good Documentation:**
+- Specific metrics: "8 approved (80%), 1 refined, 2 skipped"
+- Actionable next steps: "Fix regex pattern, re-test on 10 solvers"
+- Clear status: "Testing phase - bugs identified, fixes in progress"
+- Timestamped: "Last Updated: November 23, 2025"
+- Cross-referenced: "See Section 21 for implementation details"
+
+❌ **Poor Documentation:**
+- Vague: "Some tests passed, working on improvements"
+- No metrics: "Tested a few solvers"
+- Unclear status: "Making progress"
+- No dates: "Updated recently"
+- Isolated: No links to related docs
+
+### Documentation Consistency Checklist
+
+Before committing documentation updates, verify:
+- [ ] All files show same current phase
+- [ ] Scoring totals match across progress.md and plan.md
+- [ ] Test results (counts, percentages) consistent
+- [ ] Issues listed in progress.md match Common Issues in copilot-instructions.md
+- [ ] Next steps in notebook match progress.md
+- [ ] Timestamps updated to current date
+- [ ] All cross-references ("See Section X") are valid
+
 ## References
 
 - **Course Materials**: `doc/` folder (day-1 through day-5 PDFs)
 - **Project Plan**: `doc/plan-arcDslRefactoringAgent.prompt.md`
 - **Progress Log**: `doc/progress-arcDslRefactoringAgent.md`
+- **Type Annotation System**: `doc/type-annotation-system.md`
 - **ARC-DSL Repo**: https://github.com/michaelhodel/arc-dsl
 - **Submission**: Kaggle Competitions writeup (before Dec 1, 2025)
 
 ---
 
-**Remember**: This project demonstrates advanced agent concepts through a practical, real-world use case. The HITL pattern with automated testing and rollback ensures safety while the Memory Bank enables continuous learning. Document everything for maximum scoring! 🚀
+**Remember**: This project demonstrates advanced agent concepts through a practical, real-world use case. The HITL pattern with automated testing and rollback ensures safety while the Memory Bank enables continuous learning. **Document everything systematically for maximum scoring!** 🚀
