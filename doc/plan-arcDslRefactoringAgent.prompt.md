@@ -49,11 +49,17 @@ Upload documentation to NotebookLM, generate <3 min video showing: ARC-DSL refac
 
 ### 1. HITL approval mechanism ✅ IMPLEMENTED
 
-**Implementation:** Two-stage workflow using `input()` prompts:
-- **Stage 1 (Checkpoint #1)**: Review formatted analysis/proposal/validation → Approve/Reject/Skip/Abort
-- **Stage 2 (Checkpoint #2)**: Review test results → Commit/Rollback/Abort
+**Implementation:** Single-stage workflow with automatic regression testing:
+- **Human Review**: Analyze proposal → Approve/Refine/Skip/Abort
+- **Automatic Testing**: After approval, immediately run arc-dsl/tests.py
+- **Auto-Rollback**: If tests fail, automatically restore original code
+- **Early Detection**: Catch regressions immediately after each change
 
-All decisions saved to Memory Bank for learning patterns. Automatic backups enable safe rollback. pytest integration validates changes before commit.
+**Phase 1 Enhancements (November 2025):**
+- Removed second checkpoint - tests run automatically
+- Instant rollback on test failure prevents broken code
+- Test results shown inline for debugging
+- Safer incremental refactoring with per-change validation
 
 ### 2. Incremental refactoring strategy
 
