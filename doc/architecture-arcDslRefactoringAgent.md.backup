@@ -1,0 +1,1254 @@
+# HITL Multi-Agent Code Refactoring System - Architecture
+
+**Project:** ARC-DSL Refactoring Agent System  
+**Track:** Freestyle (Kaggle Agents Intensive Capstone)  
+**Date:** November 24, 2025  
+**Version:** 3.0 - Complete Phase 1 + Phase 2
+
+> **Implementation Status:** This document describes the complete architecture including Phase 1 (Type Annotation) and Phase 2 (Usage-Based Specialization). See `code/arc-dsl-type-refactoring-agent.ipynb` (60 cells) for the working implementation.
+
+---
+
+## System Overview
+
+A human-in-the-loop (HITL) multi-agent system that refactors the arc-dsl codebase using **two complementary strategies**:
+
+1. **Phase 1: Direct Type Refinement** - Analyzes functions and proposes refined type hints
+2. **Phase 2: Usage-Based Specialization** ⭐ **Innovation** - Creates type-safe specialized versions based on real usage patterns
+
+The system combines automated code analysis with human judgment and **multi-layer validation** (ADK Code Review → Human Approval → Automated Tests) to ensure high-quality refactoring.
+
+**Core Philosophy:** Humans approve strategy, agents execute tactics. The system proposes changes, validates them semantically, presents to humans for approval, then tests automatically with instant rollback on failure.
+
+---
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         HUMAN OPERATOR                              │
+│                    (Jupyter Notebook Interface)                     │
+└───────────────┬─────────────────────────────────┬───────────────────┘
+                │ Approval/Rejection              │ Configuration
+                ▼                                 ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                      COORDINATOR AGENT                                │
+│  • Orchestrates refactoring workflow                                  │
+│  • Manages agent collaboration via loop pattern                       │
+│  • Tracks progress across files (constants → types → dsl → solvers)   │
+│  • Enforces HITL approval at checkpoints                              │
+│  • Updates Memory Bank with decisions                                 │
+└───┬───────────────┬───────────────┬───────────────┬───────────────┬───┘
+    │               │               │               │               │
+    ▼               ▼               ▼               ▼               ▼
+ ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────────┐
+ │ANALYSIS │   │REFACTOR │   │VALIDATE │   │  DOC    │   │   MEMORY    │
+ │ AGENT   │   │ AGENT   │   │ AGENT   │   │ AGENT   │   │    BANK     │
+ └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────────┘
+     │             │             │             │               │
+     └─────────────┴─────────────┴─────────────┴───────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+              ┌─────▼─────┐        ┌────▼────┐
+              │   TOOLS   │        │ SESSION │
+              │  LIBRARY  │        │  STATE  │
+              └───────────┘        └─────────┘
+                    │
+        ┌───────────┼───────────┬───────────┐
+        │           │           │           │
+   ┌────▼───┐   ┌───▼───┐  ┌────▼────┐   ┌──▼───┐
+   │  File  │   │ Code  │  │Refactor │   │ Test │
+   │ Reader │   │Analyze│  │Proposer │   │Runner│
+   └────────┘   └───────┘  └─────────┘   └──────┘
+```
+
+---
+
+## Agent Specifications
+
+### 1. Coordinator Agent
+
+**Role:** Orchestration & workflow management
+
+**Responsibilities:**
+- Initialize refactoring session with target file selection
+- Manage sequential file processing: constants.py → arc_types.py → dsl.py → solvers.py
+- Implement loop pattern for iterative refactoring cycles
+- Enforce HITL approval checkpoints before applying changes
+- Track overall progress in session state
+- Update Memory Bank with human decisions and patterns
+- Generate final summary report
+
+**Key Prompts:**
+```python
+coordinator_prompt = """
+You are the Coordinator Agent for a code refactoring system.
+
+Your responsibilities:
+1. Orchestrate the refactoring workflow for arc-dsl files
+2. Call analysis_agent to identify refactoring opportunities
+3. Call refactor_agent to generate proposed changes
+4. Call validation_agent to test proposed changes
+5. Present proposals to human for approval via HITL checkpoint
+6. If approved: apply changes, call documentation_agent, proceed to next file
+7. If rejected: store feedback in Memory Bank, retry with adjusted approach
+8. Track progress: constants.py → arc_types.py → dsl.py → solvers.py
+
+Current session state: {session_state}
+Memory of past decisions: {memory_context}
+Current file: {current_file}
+
+Proceed with the next step in the refactoring workflow.
+"""
+```
+
+**Tools Used:**
+- `get_session_state()` - retrieve current progress
+- `update_session_state()` - save progress after each file
+- `query_memory_bank()` - retrieve past human decisions
+- `update_memory_bank()` - store new approval patterns
+- `present_approval_checkpoint()` - HITL interface
+- All agent invocation tools
+
+**Loop Pattern:**
+```python
+for file in [constants, arc_types, dsl, solvers]:
+    while not file_complete:
+        analysis = call_analysis_agent(file)
+        proposals = call_refactor_agent(file, analysis)
+        validation = call_validation_agent(proposals)
+        
+        # HITL Checkpoint
+        approval = present_to_human(proposals, validation)
+        
+        if approval.status == "approved":
+            apply_changes(proposals)
+            call_documentation_agent(file, proposals)
+            file_complete = True
+        elif approval.status == "rejected":
+            store_feedback(approval.reason)
+            # Loop continues with adjusted approach
+        else:  # "modify"
+            proposals = adjust_proposals(approval.modifications)
+            # Loop continues with modified proposals
+```
+
+---
+
+### 2. Analysis Agent
+
+**Role:** Code analysis & opportunity identification
+
+**Responsibilities:**
+- Analyze target file for refactoring opportunities
+- Identify type ambiguity issues (isinstance checks, Union types)
+- Find function signature patterns for grouping
+- Detect code smells (duplication, complexity, unclear naming)
+- Assess dependencies and impact radius
+- Generate prioritized refactoring recommendations
+
+**Key Prompts:**
+```python
+analysis_prompt = """
+You are the Analysis Agent specializing in Python code analysis.
+
+Analyze the following file for refactoring opportunities:
+File: {file_path}
+Content: {file_content}
+
+Focus on:
+1. TYPE AMBIGUITY: Union types, isinstance checks, runtime type dispatch
+2. FUNCTION GROUPING: Functions with identical signatures that could be grouped
+3. CODE SMELLS: Duplication, high complexity, unclear naming
+4. DEPENDENCIES: What other files depend on this code?
+5. PRIORITY: Which issues have highest impact vs lowest risk?
+
+Reference previous analysis: {analysis_from_doc}
+
+Output format:
+- Issues found: [{type, location, severity, description}]
+- Grouping opportunities: [{signature, functions, triage_name}]
+- Dependencies: [{file, functions_used}]
+- Recommendations: [{priority, issue, proposed_fix, risk_level}]
+"""
+```
+
+**Tools Used:**
+- `read_file()` - load target file
+- `analyze_type_usage()` - find isinstance checks and Union types
+- `find_function_signatures()` - identify grouping opportunities
+- `calculate_complexity()` - measure cyclomatic complexity
+- `trace_dependencies()` - map file dependencies
+- `google_search()` - research Python refactoring best practices
+
+**Output Format:**
+```python
+{
+  "file": "arc_types.py",
+  "issues": [
+    {
+      "type": "type_ambiguity",
+      "location": "line 7",
+      "severity": "high",
+      "description": "Numerical = Union[Integer, IntegerTuple] causes 30+ isinstance checks"
+    }
+  ],
+  "grouping_opportunities": [
+    {
+      "signature": "(Numerical, Numerical) -> Numerical",
+      "functions": ["add", "subtract", "multiply", "divide"],
+      "triage_name": "arithmetic",
+      "estimated_loc_reduction": 40
+    }
+  ],
+  "dependencies": [
+    {"file": "dsl.py", "functions_used": ["Numerical", "Patch", "Element"]}
+  ],
+  "recommendations": [
+    {
+      "priority": 1,
+      "issue": "Remove Union[Integer, IntegerTuple]",
+      "proposed_fix": "Create type-specific variants + dispatch",
+      "risk_level": "medium",
+      "estimated_effort": "2 hours"
+    }
+  ]
+}
+```
+
+---
+
+### 3. Refactor Agent
+
+**Role:** Code transformation & proposal generation
+
+**Responsibilities:**
+- Generate concrete refactoring proposals based on analysis
+- Create before/after code snippets
+- Ensure backward compatibility via wrapper functions
+- Follow Python best practices (PEP 8, type hints)
+- Estimate impact on dependent code
+- Generate incremental changes (small, testable steps)
+
+**Key Prompts:**
+```python
+refactor_prompt = """
+You are the Refactor Agent specializing in Python code transformations.
+
+Task: Generate refactoring proposal for {file_path}
+Analysis results: {analysis_results}
+Human preferences from memory: {memory_context}
+
+Requirements:
+1. INCREMENTAL: Small, testable changes (not all-at-once rewrites)
+2. BACKWARD COMPATIBLE: Maintain existing function signatures via wrappers
+3. TYPE SAFE: Add proper type hints, eliminate isinstance where possible
+4. DOCUMENTED: Include docstrings explaining changes
+5. TESTABLE: Ensure existing tests still pass
+
+Generate proposal with:
+- Target: Which issue/opportunity to address
+- Strategy: High-level approach (e.g., "split function into type-specific variants")
+- Before: Current code snippet
+- After: Refactored code snippet
+- Migration: How to update dependent code (if needed)
+- Tests: What to test to verify correctness
+- Rollback: How to undo if issues arise
+
+Follow patterns from arc-dsl analysis document for function grouping.
+"""
+```
+
+**Tools Used:**
+- `read_file()` - load current code
+- `generate_type_variants()` - create type-specific function implementations
+- `create_triage_function()` - generate dispatcher functions
+- `add_type_hints()` - improve type annotations
+- `check_pep8_compliance()` - ensure style compliance
+- `estimate_impact()` - assess changes to dependent files
+
+**Output Format:**
+```python
+{
+  "proposal_id": "refactor_001",
+  "target": "Eliminate Numerical union type ambiguity",
+  "strategy": "Create type-specific variants (_add_int, _add_tuple) + triage function (add)",
+  "changes": [
+    {
+      "file": "dsl.py",
+      "function": "add",
+      "before": "def add(a: Numerical, b: Numerical) -> Numerical:\n    if isinstance(a, int)...",
+      "after": "def _add_int(a: int, b: int) -> int:\n    return a + b\n\ndef add(a, b):\n    ...",
+      "lines_changed": 15,
+      "backward_compatible": true
+    }
+  ],
+  "migration_needed": false,
+  "tests_required": ["test_add_int_int", "test_add_tuple_tuple", "test_add_mixed"],
+  "rollback_plan": "Restore original add() function from git",
+  "estimated_time": "30 minutes"
+}
+```
+
+---
+
+### 4. Validation Agent
+
+**Role:** Testing & verification
+
+**Responsibilities:**
+- Run existing tests on refactored code
+- Create new tests for refactored functions
+- Verify backward compatibility
+- Check type correctness with mypy/pyright
+- Measure performance impact (before/after benchmarks)
+- Validate that all solvers.py functions still work
+
+**Key Prompts:**
+```python
+validation_prompt = """
+You are the Validation Agent responsible for testing refactored code.
+
+Proposal to validate: {proposal}
+Test strategy:
+1. UNIT TESTS: Test each new function variant independently
+2. INTEGRATION TESTS: Verify backward compatibility with existing callers
+3. TYPE CHECK: Run mypy on refactored files
+4. PERFORMANCE: Benchmark before/after (should be same or faster)
+5. SOLVER TESTS: Run sample solvers to ensure dsl.py changes work
+
+Available test files: {test_files}
+Existing tests: {existing_tests}
+
+Generate:
+- Test plan: Which tests to run, what to verify
+- New tests: Code for testing new function variants
+- Validation results: Pass/fail for each test category
+- Performance metrics: Execution time comparisons
+- Risk assessment: Any breaking changes detected?
+"""
+```
+
+**Tools Used:**
+- `run_test_suite()` - execute existing tests
+- `create_unit_test()` - generate new test cases
+- `run_type_checker()` - execute mypy/pyright
+- `benchmark_function()` - measure execution time
+- `validate_solvers()` - test sample solver functions
+- `check_backward_compatibility()` - verify API stability
+
+**Output Format:**
+```python
+{
+  "proposal_id": "refactor_001",
+  "validation_results": {
+    "unit_tests": {
+      "passed": 47,
+      "failed": 0,
+      "new_tests_added": 12
+    },
+    "integration_tests": {
+      "passed": 156,
+      "failed": 0,
+      "backward_compatible": true
+    },
+    "type_checking": {
+      "tool": "mypy",
+      "errors": 0,
+      "warnings": 2,
+      "improvement": "150 fewer Union type errors"
+    },
+    "performance": {
+      "before_avg_ms": 0.042,
+      "after_avg_ms": 0.038,
+      "improvement": "9.5% faster"
+    },
+    "solver_tests": {
+      "tested": 50,
+      "passed": 50,
+      "failed": 0
+    }
+  },
+  "overall_status": "PASS",
+  "recommendation": "Safe to apply",
+  "risks": []
+}
+```
+
+---
+
+### 5. Documentation Agent
+
+**Role:** Documentation generation & maintenance
+
+**Responsibilities:**
+- Update docstrings for refactored functions
+- Generate migration guides for breaking changes
+- Create before/after examples in README
+- Update architecture diagrams
+- Maintain changelog of refactoring decisions
+- Generate final submission documentation
+
+**Key Prompts:**
+```python
+documentation_prompt = """
+You are the Documentation Agent responsible for maintaining clear documentation.
+
+Completed refactoring: {proposal}
+Previous documentation: {existing_docs}
+
+Tasks:
+1. DOCSTRINGS: Write comprehensive docstrings for new functions
+2. MIGRATION GUIDE: If API changed, document how to migrate
+3. EXAMPLES: Show before/after code examples
+4. CHANGELOG: Add entry describing what changed and why
+5. README: Update main README with refactoring progress
+
+Documentation style:
+- Clear, concise explanations
+- Code examples for each major function
+- Type hints in signatures
+- Links to relevant design decisions
+
+Output format:
+- Updated docstrings: {function: docstring}
+- Migration guide: markdown text
+- Changelog entry: markdown text
+- README updates: markdown text
+"""
+```
+
+**Tools Used:**
+- `read_file()` - load existing documentation
+- `generate_docstring()` - create Google-style docstrings
+- `create_code_example()` - generate usage examples
+- `update_changelog()` - append to CHANGELOG.md
+- `render_diagram()` - update architecture diagrams
+- `write_file()` - save updated documentation
+
+**Output Format:**
+```python
+{
+  "proposal_id": "refactor_001",
+  "documentation_updates": {
+    "docstrings": {
+      "add": "\"\"\"Addition for integers and tuples...\"\"\""
+    },
+    "migration_guide": "# No migration needed - backward compatible",
+    "changelog_entry": "## [2024-11-18] Refactored arithmetic functions\n- Eliminated type ambiguity...",
+    "readme_updates": "### Refactoring Progress\n- [x] constants.py\n- [x] arc_types.py..."
+  },
+  "files_modified": ["dsl.py", "README.md", "CHANGELOG.md"]
+}
+```
+
+---
+
+## HITL Approval Checkpoint Interface
+
+The human operator approves/rejects/aborts proposals through an interactive Jupyter interface with formatted, human-readable output:
+
+### Key Features
+
+**Intelligent Output Formatting:**
+- Automatically parses JSON from agent responses
+- Falls back to truncated raw text if JSON parsing fails
+- Extracts and highlights key information (issues, recommendations, risks)
+- Presents data in structured, scannable format
+
+**Decision Options:**
+- `approve` (a/yes/y) - Apply this refactoring
+- `skip` (s) - Skip this file, continue to next
+- `reject` (r/no/n) - Reject this refactoring with optional feedback
+- `abort` (stop/quit) - Cleanly stop the entire workflow
+
+**Enhanced User Experience:**
+- Color-coded sections (📊 Analysis, 🔨 Proposal, ✅ Validation)
+- Prioritized display (top 3 issues, risks, recommendations)
+- Compact signatures for function grouping
+- Before/after snippets for proposed changes
+
+### Implementation
+
+```python
+def hitl_checkpoint(result: Dict) -> Dict:
+    """Human-in-the-loop approval checkpoint with formatted display"""
+    
+    # Display formatted sections
+    print("📊 ANALYSIS SUMMARY")
+    print(_format_analysis(result['analysis']))  # Parses and formats JSON
+    
+    print("🔨 REFACTORING PROPOSAL") 
+    print(_format_proposal(result['proposal']))  # Shows changes, strategy
+    
+    print("✅ VALIDATION RESULTS")
+    print(_format_validation(result['validation']))  # Highlights risks, compatibility
+    
+    # Present decision options
+    print("DECISION OPTIONS:")
+    print("  • approve - Apply refactoring")
+    print("  • skip    - Skip this file")
+    print("  • reject  - Reject with feedback")
+    print("  • abort   - Stop entire workflow")
+    
+    decision = input("Your decision: ").strip().lower()
+    
+    # Handle abort
+    if decision in ['abort', 'stop', 'quit', 'exit']:
+        return {'status': 'abort', 'checkpoint': {...}}
+    
+    # Handle approve/skip/reject with memory storage
+    # ...
+```
+
+### Helper Functions
+
+**JSON Parsing with Fallback:**
+```python
+def _parse_agent_output(text: str) -> Dict:
+    """Try to parse agent output as JSON, return formatted summary if fails"""
+    try:
+        # Extract JSON from markdown code blocks or parse directly
+        if '```json' in text:
+            json_text = extract_from_markdown(text)
+            return json.loads(json_text)
+        return json.loads(text)
+    except:
+        return {'raw_output': text}  # Fallback to raw text
+```
+
+**Analysis Formatter:**
+```python
+def _format_analysis(analysis: str) -> str:
+    """Format analysis output in human-readable way"""
+    parsed = _parse_agent_output(analysis)
+    
+    lines = []
+    lines.append(f"  🔍 Issues Found: {len(parsed['issues'])}")
+    for issue in parsed['issues'][:3]:  # Top 3
+        lines.append(f"     [{issue['severity']}] {issue['type']} at {issue['location']}")
+    
+    lines.append(f"  📦 Grouping Opportunities: {len(parsed['grouping_opportunities'])}")
+    lines.append(f"  💡 Top Recommendations: ...")
+    
+    return '\n'.join(lines)
+```
+
+**Proposal Formatter:**
+```python
+def _format_proposal(proposal: str) -> str:
+    """Format refactoring proposal in human-readable way"""
+    parsed = _parse_agent_output(proposal)
+    
+    lines = []
+    lines.append(f"  🎯 Target: {parsed['target']}")
+    lines.append(f"  📋 Strategy: {parsed['strategy'][:200]}...")
+    lines.append(f"  📝 Proposed Changes: {len(parsed['changes'])} file(s)")
+    
+    for change in parsed['changes'][:3]:  # Show first 3
+        lines.append(f"     {change['file']}: ~{change['lines_changed']} lines")
+        lines.append(f"        Before: {change['before'][:60]}...")
+        lines.append(f"        After:  {change['after'][:60]}...")
+    
+    return '\n'.join(lines)
+```
+
+**Validation Formatter:**
+```python
+def _format_validation(validation: str) -> str:
+    """Format validation output in human-readable way"""
+    parsed = _parse_agent_output(validation)
+    
+    lines = []
+    status = parsed['overall_status']
+    icon = '✅' if status == 'PASS' else '⚠️'
+    lines.append(f"  {icon} Overall Status: {status}")
+    
+    vr = parsed['validation_results']
+    compat_icon = '✅' if vr['backward_compatible'] else '❌'
+    lines.append(f"  {compat_icon} Backward Compatible: {vr['backward_compatible']}")
+    
+    lines.append(f"  ⚠️ Risks: {len(vr['risks'])}")
+    for risk in vr['risks'][:3]:  # Top 3
+        lines.append(f"     - {risk[:70]}...")
+    
+    return '\n'.join(lines)
+```
+
+### Workflow Abort Handling
+
+```python
+def run_refactoring_session():
+    """Execute workflow with abort support"""
+    for file_path in session_state['files_to_process']:
+        result = coordinator.process_file(file_path)
+        decision = hitl_checkpoint(result)
+        
+        # Handle abort
+        if decision['status'] == 'abort':
+            print("🛑 WORKFLOW ABORTED BY USER")
+            print(f"Files processed: {len(completed)}/{len(total)}")
+            session_state['checkpoints'].append(decision['checkpoint'])
+            break  # Clean exit
+        
+        # Handle other decisions (approve/skip/reject)
+        # ...
+```
+
+### Alternative: ipywidgets Interface (Future Enhancement)
+
+For richer interactivity (not currently implemented):
+
+```python
+from ipywidgets import Button, VBox, HTML, Textarea
+
+class HITLCheckpoint:
+    def display(self):
+        # Interactive buttons with real-time feedback
+        approve_btn = Button(description='✅ Approve', button_style='success')
+        skip_btn = Button(description='⏭️ Skip', button_style='info')
+        reject_btn = Button(description='❌ Reject', button_style='danger')
+        abort_btn = Button(description='🛑 Abort', button_style='warning')
+        
+        # Event handlers update self.decision
+        # ...
+```
+
+### Simple input() Interface (Current Implementation)
+
+Used for maximum compatibility across Jupyter environments:
+
+```python
+def simple_hitl_checkpoint(proposal, validation):
+    print(f"\n{'='*80}")
+    print(f"REFACTORING PROPOSAL: {proposal['proposal_id']}")
+    print(f"{'='*80}")
+    print(f"Target: {proposal['target']}")
+    print(f"Strategy: {proposal['strategy']}")
+    print(f"\nValidation: {validation['overall_status']}")
+    print(f"Tests: {validation['unit_tests']['passed']} passed")
+    print(f"Performance: {validation['performance']['improvement']}")
+    print(f"\n{'-'*80}")
+    
+    # Show diff
+    for change in proposal['changes']:
+        print(f"\nFile: {change['file']}")
+        print("BEFORE:")
+        print(change['before'])
+        print("\nAFTER:")
+        print(change['after'])
+    
+    print(f"\n{'='*80}")
+    
+    while True:
+        decision = input("Decision [approve/modify/reject]: ").lower()
+        if decision in ['approve', 'modify', 'reject']:
+            break
+        print("Invalid choice. Please enter 'approve', 'modify', or 'reject'.")
+    
+    feedback = ""
+    if decision in ['modify', 'reject']:
+        feedback = input("Feedback/reason: ")
+    
+    return {
+        'status': decision,
+        'feedback': feedback,
+        'timestamp': datetime.now()
+    }
+```
+
+---
+
+## Session State Management
+
+Track refactoring progress across files and iterations:
+
+```python
+from google.adk.sessions import InMemorySessionService
+
+session_state = {
+    "session_id": "refactor_arc_dsl_20241118",
+    "start_time": "2024-11-18T10:00:00",
+    "current_file": "arc_types.py",
+    "files_completed": ["constants.py"],
+    "files_remaining": ["dsl.py", "solvers.py"],
+    "total_proposals": 12,
+    "approved_proposals": 8,
+    "rejected_proposals": 1,
+    "modified_proposals": 3,
+    "current_iteration": 2,
+    "metrics": {
+        "isinstance_checks_removed": 45,
+        "functions_grouped": 23,
+        "lines_added": 456,
+        "lines_removed": 234,
+        "net_lines": 222,
+        "test_coverage": "94%",
+        "type_checker_errors": 0
+    },
+    "checkpoints": [
+        {
+            "file": "constants.py",
+            "proposal_id": "refactor_001",
+            "timestamp": "2024-11-18T10:15:00",
+            "decision": "approved",
+            "human_feedback": "Looks good, proceed"
+        }
+    ]
+}
+
+# Update after each checkpoint
+session_service = InMemorySessionService()
+session_service.save_state(session_id, session_state)
+```
+
+---
+
+## Memory Bank Integration
+
+Learn from human approval patterns to improve future proposals:
+
+```python
+from google.adk.memory import MemoryBank
+
+memory_bank = MemoryBank()
+
+# Store human decision patterns
+memory_bank.store({
+    "type": "approval_pattern",
+    "context": "Type ambiguity refactoring",
+    "human_preference": "Prefers incremental changes over big rewrites",
+    "example": {
+        "approved": "Split one function at a time with backward compatibility",
+        "rejected": "Rewrite entire file in one proposal"
+    },
+    "confidence": 0.95
+})
+
+memory_bank.store({
+    "type": "naming_preference",
+    "context": "Triage function naming",
+    "pattern": "Use verb_noun format (e.g., 'arithmetic' not 'do_arithmetic')",
+    "examples": ["arithmetic", "transform_numerical", "filter_container"]
+})
+
+memory_bank.store({
+    "type": "testing_requirement",
+    "context": "Validation expectations",
+    "requirement": "Must test all solver functions, not just unit tests",
+    "importance": "high"
+})
+
+# Query memory before generating proposals
+preferences = memory_bank.query("approval patterns for refactoring")
+```
+
+---
+
+## Custom Tools Library
+
+### File Operations
+
+```python
+@tool
+def read_file_tool(file_path: str) -> str:
+    """Read contents of a source file."""
+    with open(file_path, 'r') as f:
+        return f.read()
+
+@tool
+def write_file_tool(file_path: str, content: str) -> str:
+    """Write content to a file (with backup)."""
+    # Create backup
+    backup_path = f"{file_path}.backup"
+    if os.path.exists(file_path):
+        shutil.copy(file_path, backup_path)
+    
+    # Write new content
+    with open(file_path, 'w') as f:
+        f.write(content)
+    
+    return f"Written to {file_path}, backup at {backup_path}"
+```
+
+### Code Analysis
+
+```python
+@tool
+def analyze_type_usage(file_path: str) -> dict:
+    """Find isinstance checks and Union types in Python file."""
+    import ast
+    
+    with open(file_path, 'r') as f:
+        tree = ast.parse(f.read())
+    
+    isinstance_calls = []
+    union_types = []
+    
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            if getattr(node.func, 'id', None) == 'isinstance':
+                isinstance_calls.append({
+                    'line': node.lineno,
+                    'args': [ast.unparse(arg) for arg in node.args]
+                })
+        
+        if isinstance(node, ast.Subscript):
+            if ast.unparse(node.value) == 'Union':
+                union_types.append({
+                    'line': node.lineno,
+                    'definition': ast.unparse(node)
+                })
+    
+    return {
+        'isinstance_checks': isinstance_calls,
+        'union_types': union_types,
+        'total_isinstance': len(isinstance_calls),
+        'total_unions': len(union_types)
+    }
+
+@tool
+def find_function_signatures(file_path: str) -> dict:
+    """Identify functions with identical signatures for grouping."""
+    import ast
+    from collections import defaultdict
+    
+    with open(file_path, 'r') as f:
+        tree = ast.parse(f.read())
+    
+    signature_groups = defaultdict(list)
+    
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            # Extract signature
+            params = [arg.annotation for arg in node.args.args if arg.annotation]
+            returns = node.returns
+            
+            if params and returns:
+                sig = f"({', '.join(ast.unparse(p) for p in params)}) -> {ast.unparse(returns)}"
+                signature_groups[sig].append(node.name)
+    
+    # Filter to groups with 2+ functions
+    groupable = {sig: funcs for sig, funcs in signature_groups.items() if len(funcs) >= 2}
+    
+    return {
+        'total_signatures': len(signature_groups),
+        'groupable_signatures': len(groupable),
+        'groups': groupable
+    }
+```
+
+### Refactoring Utilities
+
+```python
+@tool
+def generate_type_variants(function_code: str, type_params: list) -> dict:
+    """Generate type-specific variants of a function."""
+    # Parse function
+    import ast
+    tree = ast.parse(function_code)
+    func_def = tree.body[0]
+    
+    variants = {}
+    for type_combo in type_params:
+        # Create variant name
+        variant_name = f"_{func_def.name}_{'_'.join(type_combo)}"
+        
+        # Clone function AST
+        variant_def = copy.deepcopy(func_def)
+        variant_def.name = variant_name
+        
+        # Update type annotations
+        for i, arg in enumerate(variant_def.args.args):
+            arg.annotation = ast.Name(id=type_combo[i])
+        
+        # Remove isinstance checks from body
+        # (simplified - actual implementation would be more sophisticated)
+        
+        variants[variant_name] = ast.unparse(variant_def)
+    
+    return variants
+
+@tool
+def create_triage_function(original_func: str, variants: dict) -> str:
+    """Create dispatcher function that routes to type-specific variants."""
+    import ast
+    
+    tree = ast.parse(original_func)
+    func_def = tree.body[0]
+    func_name = func_def.name
+    
+    # Generate dispatch table
+    dispatch_code = f"""
+def {func_name}(a, b):
+    \"\"\"Triage function for {func_name} - dispatches to type-specific variants.\"\"\"
+    type_key = (type(a), type(b))
+    dispatch = {{
+"""
+    
+    for variant_name, variant_code in variants.items():
+        # Extract type combo from variant name
+        # e.g., "_add_int_tuple" -> (int, tuple)
+        types = variant_name.split('_')[2:]  # ['int', 'tuple']
+        dispatch_code += f"        ({', '.join(types)}): {variant_name},\n"
+    
+    dispatch_code += f"""    }}
+    return dispatch[type_key](a, b)
+"""
+    
+    return dispatch_code
+```
+
+### Testing & Validation
+
+```python
+@tool
+def run_test_suite(test_file: str = None) -> dict:
+    """Run pytest on specified test file or entire suite."""
+    import subprocess
+    
+    cmd = ['pytest', '-v', '--tb=short']
+    if test_file:
+        cmd.append(test_file)
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    # Parse pytest output
+    lines = result.stdout.split('\n')
+    passed = failed = 0
+    for line in lines:
+        if ' passed' in line:
+            passed = int(line.split()[0])
+        if ' failed' in line:
+            failed = int(line.split()[0])
+    
+    return {
+        'exit_code': result.returncode,
+        'passed': passed,
+        'failed': failed,
+        'output': result.stdout,
+        'success': result.returncode == 0
+    }
+
+@tool
+def run_type_checker(file_path: str, tool: str = 'mypy') -> dict:
+    """Run static type checker on file."""
+    import subprocess
+    
+    cmd = [tool, file_path, '--strict']
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    # Parse output
+    errors = result.stdout.count('error:')
+    warnings = result.stdout.count('warning:')
+    
+    return {
+        'tool': tool,
+        'errors': errors,
+        'warnings': warnings,
+        'output': result.stdout,
+        'success': errors == 0
+    }
+
+@tool
+def validate_solvers(sample_size: int = 50) -> dict:
+    """Test random sample of solver functions to ensure dsl.py changes work."""
+    import importlib
+    import random
+    
+    # Import solvers module
+    solvers = importlib.import_module('solvers')
+    
+    # Get all solve_* functions
+    solver_funcs = [name for name in dir(solvers) if name.startswith('solve_')]
+    
+    # Sample
+    sample = random.sample(solver_funcs, min(sample_size, len(solver_funcs)))
+    
+    passed = failed = 0
+    failures = []
+    
+    for func_name in sample:
+        try:
+            # Test with dummy input (simplified - actual would use real test cases)
+            func = getattr(solvers, func_name)
+            # Would need actual test inputs here
+            passed += 1
+        except Exception as e:
+            failed += 1
+            failures.append({'function': func_name, 'error': str(e)})
+    
+    return {
+        'tested': len(sample),
+        'passed': passed,
+        'failed': failed,
+        'failures': failures,
+        'success': failed == 0
+    }
+```
+
+---
+
+## Workflow Sequence
+
+### Phase 1: File-by-File Refactoring
+
+```
+1. Initialize Session
+   └─> Load session state, initialize Memory Bank
+
+2. For each file (constants.py → arc_types.py → dsl.py → solvers.py):
+   
+   a. Analysis Phase
+      └─> Coordinator calls Analysis Agent
+          └─> Analysis Agent uses tools:
+              - read_file_tool
+              - analyze_type_usage
+              - find_function_signatures
+          └─> Returns analysis report
+   
+   b. Proposal Generation
+      └─> Coordinator calls Refactor Agent with analysis
+          └─> Refactor Agent uses tools:
+              - read_file_tool
+              - generate_type_variants
+              - create_triage_function
+          └─> Returns refactoring proposal
+   
+   c. Validation
+      └─> Coordinator calls Validation Agent with proposal
+          └─> Validation Agent uses tools:
+              - run_test_suite
+              - run_type_checker
+              - validate_solvers
+          └─> Returns validation results
+   
+   d. HITL Checkpoint
+      └─> Coordinator presents proposal + validation to human
+          └─> Display HITL interface (ipywidgets or input())
+          └─> Human decides: approve/modify/reject
+   
+   e. Decision Handling
+      └─> If APPROVED:
+          - Apply changes (write_file_tool)
+          - Call Documentation Agent to update docs
+          - Update session state
+          - Store decision in Memory Bank
+          - Proceed to next file
+      
+      └─> If MODIFY:
+          - Store modification request in Memory Bank
+          - Call Refactor Agent with modifications
+          - Loop back to Validation
+      
+      └─> If REJECT:
+          - Store rejection reason in Memory Bank
+          - Adjust refactoring strategy
+          - Loop back to Proposal Generation
+
+3. Final Report
+   └─> Coordinator generates summary:
+       - Files completed
+       - Total proposals approved/rejected
+       - Metrics (isinstance removed, functions grouped, etc.)
+       - Test coverage
+       - Performance improvements
+```
+
+### Phase 2: Integration & Documentation
+
+```
+4. Integration Testing
+   └─> Run full test suite on all refactored files
+   └─> Validate all 400+ solvers still work
+   └─> Type check entire codebase
+
+5. Documentation Generation
+   └─> Documentation Agent creates:
+       - Updated README.md
+       - CHANGELOG.md
+       - Migration guides
+       - Architecture diagrams
+
+6. Submission Preparation
+   └─> Generate final materials:
+       - GitHub repository
+       - Kaggle writeup
+       - NotebookLM video content
+```
+
+---
+
+## Scoring Tracker Integration
+
+Track progress toward 100-point goal:
+
+```python
+scoring_tracker = {
+    "pitch": {
+        "core_concept": {
+            "max_points": 15,
+            "criteria": "Clear HITL refactoring problem, innovative agent solution",
+            "status": "in_progress",
+            "notes": "Meta-agent approach (agents refactoring code) is unique"
+        },
+        "writeup": {
+            "max_points": 15,
+            "criteria": "Clear problem/solution/architecture/journey",
+            "status": "not_started"
+        },
+        "total": 30,
+        "earned": 0
+    },
+    "implementation": {
+        "technical": {
+            "max_points": 50,
+            "key_concepts_demonstrated": {
+                "multi_agent": {"demonstrated": True, "notes": "5 agents coordinated"},
+                "custom_tools": {"demonstrated": True, "notes": "10+ custom tools"},
+                "sessions_memory": {"demonstrated": True, "notes": "InMemorySessionService + Memory Bank"},
+                "observability": {"demonstrated": True, "notes": "LoggingPlugin"},
+                "context_engineering": {"demonstrated": False, "notes": "TODO: handle large dsl.py file"},
+                "agent_evaluation": {"demonstrated": True, "notes": "Validation agent tests proposals"},
+                "built_in_tools": {"demonstrated": True, "notes": "Google Search for best practices"}
+            },
+            "code_quality": {"status": "in_progress", "notes": "Well-commented, type-hinted"},
+            "status": "in_progress",
+            "earned": 25  # Partial credit
+        },
+        "documentation": {
+            "max_points": 20,
+            "readme": {"status": "in_progress"},
+            "architecture_diagrams": {"status": "complete"},
+            "setup_instructions": {"status": "not_started"},
+            "status": "in_progress",
+            "earned": 10  # Partial credit
+        },
+        "total": 70,
+        "earned": 35
+    },
+    "bonus": {
+        "gemini": {
+            "max_points": 5,
+            "status": "complete",
+            "notes": "All agents powered by Gemini 2.5 Flash Lite"
+        },
+        "deployment": {
+            "max_points": 5,
+            "status": "not_started",
+            "notes": "TODO: Deploy to Cloud Run or Agent Engine"
+        },
+        "video": {
+            "max_points": 10,
+            "status": "not_started",
+            "notes": "TODO: Generate NotebookLM video"
+        },
+        "total": 20,
+        "earned": 5
+    },
+    "grand_total": {
+        "max": 100,
+        "earned": 40,
+        "remaining": 60,
+        "progress": "40%"
+    }
+}
+```
+
+---
+
+## Technology Stack
+
+### Core Framework
+- **Agent Development Kit (ADK)** - Python version for Jupyter Notebook
+- **InMemoryRunner** - Interactive execution in notebook
+- **InMemorySessionService** - Session state management
+- **Memory Bank** - Long-term memory for learning
+
+### LLM
+- **Gemini 2.5 Flash Lite** - Powers all 5 agents
+
+### Tools
+- **Custom Tools** - File I/O, code analysis, refactoring utilities, testing
+- **Built-in Tools** - Google Search for best practices research
+
+### Observability
+- **LoggingPlugin** - Traces, metrics, logs for debugging
+
+### Testing
+- **pytest** - Test suite execution
+- **mypy/pyright** - Static type checking
+
+### Deployment
+- **Cloud Run** or **Google Agent Engine** - HITL web interface
+- **NotebookLM** - Video generation for submission
+
+---
+
+## Risk Mitigation
+
+### Risk 1: Breaking Existing Code
+**Mitigation:**
+- Incremental changes (one file at a time)
+- Backward compatibility wrappers
+- Validation agent tests all solvers
+- Git backups before each change
+- HITL approval prevents unauthorized changes
+
+### Risk 2: Human Bottleneck
+**Mitigation:**
+- Smart batching (group similar proposals)
+- Clear approval interface (one-click approve for low-risk changes)
+- Memory Bank learns preferences (fewer approvals needed over time)
+- Default to conservative changes (higher auto-approval rate)
+
+### Risk 3: Agent Hallucination
+**Mitigation:**
+- Validation agent catches errors before human review
+- Test suite must pass before presenting to human
+- Type checker validates correctness
+- Human has final veto power
+
+### Risk 4: Scope Creep
+**Mitigation:**
+- Strict file ordering (constants → types → dsl → solvers)
+- Focus on two primary goals: reduce type ambiguity, group functions
+- Time-box each file (if not done in 2 hours, move to next)
+- Session state tracks progress, enforces sequencing
+
+---
+
+## Success Metrics
+
+### Code Quality
+- ✅ isinstance() checks reduced by 90%
+- ✅ Union types eliminated from arc_types.py
+- ✅ 20+ function families created with triage functions
+- ✅ Type checker errors: 0
+- ✅ Test coverage maintained at 90%+
+
+### Project Completeness
+- ✅ All 4 files refactored
+- ✅ Documentation complete
+- ✅ Deployed HITL interface
+- ✅ Video created and published
+- ✅ Kaggle submission submitted before Dec 1, 2025
+
+### Scoring
+- 🎯 Pitch: 30/30 points (clear problem, innovative solution, strong writeup)
+- 🎯 Implementation: 70/70 points (7+ key concepts, quality code, excellent docs)
+- 🎯 Bonus: 20/20 points (Gemini, deployment, video)
+- 🎯 **TOTAL: 100/100 points**
+
+---
+
+## Next Steps
+
+1. ✅ Architecture design complete
+2. ⏭️ Implement agents in Jupyter Notebook (Step 3)
+3. ⏭️ Add observability and scoring tracker (Step 4)
+4. ⏭️ Deploy HITL system (Step 5)
+5. ⏭️ Create submission materials (Step 6)
+
+**Status:** Ready to begin implementation! 🚀
