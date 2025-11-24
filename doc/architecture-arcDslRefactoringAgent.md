@@ -2,8 +2,10 @@
 
 **Project:** ARC-DSL Refactoring Agent System  
 **Track:** Freestyle (Kaggle Agents Intensive Capstone)  
-**Date:** November 18, 2025  
-**Version:** 1.0
+**Date:** November 24, 2025  
+**Version:** 2.0 - Phase 1 Simplified
+
+> **Note:** This document describes the original multi-agent architecture. The current implementation focuses on **Phase 1: Type Annotation** with a streamlined single-agent workflow. See notebook sections 1-4 for the active implementation.
 
 ---
 
