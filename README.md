@@ -286,7 +286,7 @@ echo "GOOGLE_API_KEY=your_api_key_here" > .env
 ### Running the System
 
 **Phase 1: Direct Type Refinement** (Educational - demonstrates no-op issue)
-1. Open `arc-dsl-refactoring-agent.ipynb`
+1. Open `arc-dsl-type-refactoring-agent.ipynb`
 2. Run cells 1-40 sequentially
 3. Observe: Generic functions like `extract()` produce Any → Any (no change needed)
 
@@ -417,7 +417,7 @@ This project demonstrates **all 8 core course concepts**:
 
 ```
 code/
-├── arc-dsl-refactoring-agent.ipynb   # Main notebook (59 cells)
+├── arc-dsl-type-refactoring-agent.ipynb   # Main notebook (60 cells, complete Phase 1+2)
 │   ├── Cells 1-10:    Setup, imports, Gemini config
 │   ├── Cells 11-40:   Phase 1 (Direct Type Refinement)
 │   ├── Cells 41-46:   Phase 2 Analysis Tools
@@ -722,7 +722,7 @@ memory_bank = {
 - **[Quick Reference](doc/QUICK_REFERENCE.md)**: Essential commands and workflows
 
 **Working Code**:
-- **[Jupyter Notebook](code/arc-dsl-refactoring-agent.ipynb)**: 59-cell implementation (all cells executable)
+- **[Jupyter Notebook](code/arc-dsl-type-refactoring-agent.ipynb)**: 60-cell implementation (all cells executable)
 
 **Deployment**:
 - **[Deployment Guide](code/deployment/DEPLOYMENT.md)**: Cloud Run deployment instructions
