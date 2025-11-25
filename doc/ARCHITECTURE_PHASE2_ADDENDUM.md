@@ -42,9 +42,9 @@ This approach is fundamentally different from traditional refactoring:
 │ Agent  │  │Agent   │  │zation    │    (temp 0.1-0.3)
 │        │  │(Gemini)│  │Agent     │
 └────┬───┘  └────┬───┘  │(Gemini)  │
-     │           │       └────┬─────┘
-     │           │            │
-     ▼           ▼            ▼
+     │           │      └────┬─────┘
+     │           │           │
+     ▼           ▼           ▼
 ┌────────────────────────────────┐
 │   Code Review Agent (ADK)      │  ← Semantic Validation
 │   Gemini 2.0 Flash (temp 0.1)  │    66% rejection precision

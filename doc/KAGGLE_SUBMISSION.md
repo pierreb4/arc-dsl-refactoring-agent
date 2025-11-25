@@ -10,13 +10,13 @@
 
 ### Completed ✅
 
-| Category | Points | Status | Evidence |
-|----------|--------|--------|----------|
-| **Implementation** | 70/70 | ✅ Done | 6-agent system, ADK integration, comprehensive testing |
-| **Pitch/Writeup** | 30/30 | ✅ Done | Clear problem, innovative solution, detailed architecture |
-| **Gemini Integration** | 5/5 | ✅ Done | Powers 3 agents (Proposer, Specialization, Code Review) |
-| **Deployment** | 5/5 | ✅ Done | Cloud Run ready with FastAPI + web UI |
-| **Video** | 0/10 | ⏳ Pending | **FINAL TASK** |
+| Category               | Points | Status     | Evidence                                                  |
+|------------------------|--------|------------|-----------------------------------------------------------|
+| **Implementation**     | 70/70  | ✅ Done    | 6-agent system, ADK integration, comprehensive testing    |
+| **Pitch/Writeup**      | 30/30  | ✅ Done    | Clear problem, innovative solution, detailed architecture |
+| **Gemini Integration** | 5/5    | ✅ Done    | Powers 3 agents (Proposer, Specialization, Code Review)   |
+| **Deployment**         | 5/5    | ✅ Done    | Cloud Run ready with FastAPI + web UI                     |
+| **Video**              | 0/10   | ⏳ Pending | **FINAL TASK**                                            |
 
 ---
 
@@ -160,7 +160,7 @@ Kaggle Notebook: [If you upload notebook]
 
 cd "/Users/pierre/Library/CloudStorage/GoogleDrive-pierre@baume.org/My Drive/AI Agents Intensive"
 
-git remote add origin https://github.com/your-username/arc-dsl-refactoring-agent.git
+git remote add origin https://github.com/pierreb4/arc-dsl-refactoring-agent.git
 git branch -M main
 git push -u origin main
 ```
