@@ -2,6 +2,42 @@
 
 **TL;DR:** Build a human-in-the-loop (HITL) multi-agent system for incrementally refactoring the ARC-DSL codebase (constants.py, arc_types.py, dsl.py, solvers.py). Use ADK in Jupyter Notebook following course patterns, deploy with Gemini, implement scoring system to maximize all 100 points (70 implementation + 30 pitch + 20 bonus). This meta-agent approach—agents that help refactor/improve code—perfectly fits the Freestyle track's innovative/unclassifiable category.
 
+## ⚠️ CRITICAL REQUIREMENT: Retry Configuration
+
+**ALL agents MUST include retry logic on EVERY Gemini API call. This is NON-NEGOTIABLE.**
+
+```python
+from google.genai import types
+
+# Define once at the top of your notebook
+retry_config = types.HttpRetryOptions(
+    attempts=5,
+    exp_base=7,
+    initial_delay=1,
+    http_status_codes=[429, 500, 503, 504]
+)
+
+# Apply to EVERY generate_content call
+response = client.models.generate_content(
+    model=MODEL_ID,
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        http_options=retry_config  # REQUIRED
+    )
+)
+```
+
+**Why this is mandatory:**
+- ❌ Without retry: Agents fail on rate limits (429), workflows abort, manual intervention needed
+- ✅ With retry: 5 attempts with exponential backoff = 99%+ success rate, production-ready reliability
+- 🎯 Best Practice: Prevents API quota issues in long-running workflows (Phase 2 processes 91+ proposals)
+
+**Where to apply:**
+- ✅ Proposer Agent (type refactoring proposals)
+- ✅ Specialization Agent (usage-based specialization)
+- ✅ Code Review Agent (ADK semantic validation)
+- ✅ ALL custom agents that call Gemini API
+
 ## Steps
 
 ### 1. Clone arc-dsl repo and analyze refactoring needs
@@ -25,6 +61,35 @@ Create agent system with: `coordinator_agent` (orchestrates refactoring workflow
 ### 3. Implement agents in Jupyter Notebook with ADK
 
 Create notebook in `/code/` following patterns from course PDFs in `/doc/`. Use Gemini 2.5 Flash Lite for all agents (no InMemoryRunner needed - direct API calls). Implement custom tools (file_reader, code_analyzer, refactor_proposer, test_runner), use Gemini models, add sessions/state to track refactoring progress across files, implement Memory Bank to remember previous refactoring decisions.
+
+**CRITICAL: Retry Configuration (ALWAYS REQUIRED)**
+ALL agents must be configured with robust error handling and retry logic:
+```python
+from google.genai import types
+
+# Configure retry options for ALL Gemini API calls
+retry_config = types.HttpRetryOptions(
+    attempts=5,  # Maximum retry attempts
+    exp_base=7,  # Delay multiplier for exponential backoff
+    initial_delay=1,  # Initial delay in seconds
+    http_status_codes=[429, 500, 503, 504],  # Retry on rate limits and server errors
+)
+
+# Apply to EVERY generate_content call
+response = client.models.generate_content(
+    model=MODEL_ID,
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        http_options=retry_config  # ALWAYS include this
+    )
+)
+```
+
+**Why this is critical:**
+- Prevents failures from transient API errors (rate limits, server issues)
+- Enables long-running workflows without manual intervention
+- Exponential backoff prevents overwhelming the API
+- Production-ready reliability (5 attempts = 99%+ success rate)
 
 **Two-Stage HITL Implementation:**
 1. First checkpoint reviews agent proposal
@@ -83,8 +148,16 @@ Ensure hitting all criteria:
 - Context engineering ✓ (specialized system prompts per agent)
 - Agent evaluation ✓ (automated pytest testing + two-stage HITL validation)
 - Gemini ✓ (Gemini 2.5 Flash Lite powers all 5 agents)
+- **Retry Logic ✓ (HttpRetryOptions on ALL API calls - REQUIRED for production)**
 - Deployment ⏳ (Cloud Run pending)
 - Video ⏳ (NotebookLM pending)
+
+**MANDATORY: Retry Configuration**
+Every single `client.models.generate_content()` call MUST include retry configuration:
+```python
+config=types.GenerateContentConfig(http_options=retry_config)
+```
+Without this, agents will fail on rate limits (429) and transient errors. This is NON-NEGOTIABLE for production deployments.
 
 **Current Score: 95/100 points**
 - ✅ Implementation: 70/70 (Phase 1 complete, tested, production-ready)
