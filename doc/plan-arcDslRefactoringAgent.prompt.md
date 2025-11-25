@@ -2,9 +2,11 @@
 
 **TL;DR:** Build a human-in-the-loop (HITL) multi-agent system for incrementally refactoring the ARC-DSL codebase (constants.py, arc_types.py, dsl.py, solvers.py). Use ADK in Jupyter Notebook following course patterns, deploy with Gemini, implement scoring system to maximize all 100 points (70 implementation + 30 pitch + 20 bonus). This meta-agent approach—agents that help refactor/improve code—perfectly fits the Freestyle track's innovative/unclassifiable category.
 
-## ⚠️ CRITICAL REQUIREMENT: Retry Configuration
+## ⚠️ CRITICAL REQUIREMENTS
 
-**ALL agents MUST include retry logic on EVERY Gemini API call. This is NON-NEGOTIABLE.**
+### 1. Retry Configuration (NON-NEGOTIABLE)
+
+**ALL agents MUST include retry logic on EVERY Gemini API call.**
 
 ```python
 from google.genai import types
@@ -37,6 +39,52 @@ response = client.models.generate_content(
 - ✅ Specialization Agent (usage-based specialization)
 - ✅ Code Review Agent (ADK semantic validation)
 - ✅ ALL custom agents that call Gemini API
+
+### 2. Documentation Sync (MANDATORY)
+
+**ALWAYS update Kaggle submission documents when modifying the Jupyter notebook.**
+
+**📋 Documents to Update:**
+
+| Document | Location | Update When |
+|----------|----------|-------------|
+| **README.md** | `/README.md` | Major workflow changes, new agents, architecture updates |
+| **KAGGLE_WRITEUP.md** | `/KAGGLE_WRITEUP.md` | New features, capabilities, results, demonstrations |
+| **PROJECT_STATUS.md** | `/PROJECT_STATUS.md` | Progress updates, completions, next steps |
+| **architecture-arcDslRefactoringAgent.md** | `/doc/` | New agents, workflow changes, system design updates |
+| **progress-arcDslRefactoringAgent.md** | `/doc/` | Implementation milestones, testing results, metrics |
+| **KAGGLE_SUBMISSION.md** | `/doc/` | Final submission checklist, video URL, deployment status |
+
+**🔄 Update Workflow:**
+1. **Before committing notebook changes**: Review which documents need updates
+2. **Update relevant sections**: Add new features, update architecture diagrams, refresh metrics
+3. **Keep consistent**: Ensure all docs describe the same current state
+4. **Commit together**: `git add` notebook + updated docs in same commit
+5. **Clear commit message**: Explain both code and doc changes
+
+**⚠️ Common Mistakes to Avoid:**
+- ❌ Adding new agents without updating architecture docs
+- ❌ Changing workflows without updating README examples
+- ❌ Implementing HITL features without documenting in KAGGLE_WRITEUP
+- ❌ Updating metrics in code but not in PROJECT_STATUS
+- ❌ Completing milestones without updating progress docs
+
+**✅ Best Practice:**
+Create a checklist comment in notebook cells that modify major features:
+```python
+# 🔄 DOCUMENTATION UPDATE REQUIRED:
+# - [ ] README.md: Add refactor_solver_calls_hitl example
+# - [ ] KAGGLE_WRITEUP.md: Document Phase 2 HITL workflow
+# - [ ] architecture-arcDslRefactoringAgent.md: Add solver refactoring agent
+# - [ ] PROJECT_STATUS.md: Mark Phase 2 as complete
+```
+
+**Why this matters:**
+- Kaggle judges read the writeup, not the notebook
+- README is the first impression for evaluators
+- Documentation demonstrates professionalism and completeness
+- Out-of-sync docs suggest incomplete or abandoned work
+- Clear docs = higher "Writeup" score (15/30 points)
 
 ## Steps
 

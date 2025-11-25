@@ -470,6 +470,75 @@ rm code/*.backup.*
 rm code/refactoring_report_*.txt
 ```
 
+## ⚠️ MANDATORY: Kaggle Submission Documentation Sync
+
+**CRITICAL:** ALWAYS update Kaggle submission documents when modifying the Jupyter notebook!
+
+### Why This Matters
+- Kaggle judges read the **writeup**, not the notebook code
+- Out-of-sync docs = lower "Writeup" score (15/30 points)
+- Documentation demonstrates professionalism and completeness
+- README is the first impression for evaluators
+
+### Required Updates When Changing Notebook
+
+| Your Change | Update These Docs |
+|-------------|-------------------|
+| 🤖 New agent/workflow | `README.md`, `KAGGLE_WRITEUP.md`, `architecture-arcDslRefactoringAgent.md` |
+| ✨ New feature | `KAGGLE_WRITEUP.md`, `PROJECT_STATUS.md` |
+| 📊 Progress/metrics | `PROJECT_STATUS.md`, `progress-arcDslRefactoringAgent.md` |
+| 🏗️ Architecture change | `README.md`, `architecture-arcDslRefactoringAgent.md` |
+| ✅ Milestone complete | `PROJECT_STATUS.md`, `FINAL_CHECKLIST.md` |
+| 🎬 Video/deployment | `KAGGLE_SUBMISSION.md`, `VIDEO_QUICK_START.md` |
+
+### Update Workflow (Mandatory Steps)
+
+1. **Before committing notebook changes**: Review which documents need updates
+2. **Update relevant sections**: Add new features, update architecture diagrams, refresh metrics
+3. **Keep consistent**: Ensure all docs describe the same current state
+4. **Commit together**: `git add` notebook + updated docs in same commit
+5. **Clear commit message**: Explain both code and doc changes
+
+### Common Mistakes to Avoid
+
+- ❌ Adding new agents without updating architecture docs
+- ❌ Changing workflows without updating README examples
+- ❌ Implementing HITL features without documenting in KAGGLE_WRITEUP
+- ❌ Updating metrics in code but not in PROJECT_STATUS
+- ❌ Completing milestones without updating progress docs
+
+### Best Practice: Documentation Checklist in Code
+
+Add checklist comments to notebook cells that modify major features:
+
+```python
+# 🔄 DOCUMENTATION UPDATE REQUIRED:
+# - [ ] README.md: Add refactor_solver_calls_hitl example
+# - [ ] KAGGLE_WRITEUP.md: Document Phase 2 HITL workflow
+# - [ ] architecture-arcDslRefactoringAgent.md: Add solver refactoring agent
+# - [ ] PROJECT_STATUS.md: Mark Phase 2 as complete
+```
+
+### Enforcement
+
+**Before every commit involving notebook changes:**
+1. Ask yourself: "What docs need updating?"
+2. Update those docs immediately
+3. Stage notebook + docs together
+4. Commit with message explaining both changes
+
+**Example:**
+```bash
+git add code/arc-dsl-type-refactoring-agent.ipynb
+git add README.md
+git add KAGGLE_WRITEUP.md
+git commit -m "feat(hitl): add Phase 2 solver refactoring workflow
+
+- Implemented refactor_solver_calls_hitl() with batch processing
+- Updated README with Phase 2 workflow examples
+- Documented HITL decision points in KAGGLE_WRITEUP"
+```
+
 ## Systematic Documentation Update Guidelines
 
 **CRITICAL:** Keep all documentation files synchronized when making changes to the system.
