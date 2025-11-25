@@ -22,10 +22,11 @@
 - ✅ Documented in `doc/architecture-arcDslRefactoringAgent.md`
 
 ### Step 3: Implement in Jupyter ✅
-- ✅ 59-cell notebook: `code/arc-dsl-refactoring-agent.ipynb`
+- ✅ 67-cell notebook: `code/arc-dsl-type-refactoring-agent.ipynb`
 - ✅ Gemini 2.0 Flash Lite powers 3 agents
 - ✅ Session management and memory bank
 - ✅ Automated workflow with HITL checkpoints
+- ✅ Phase 2B HITL demonstration (cells 66-67)
 - ✅ All cells executable and tested
 
 ### Step 4: Add Observability ✅

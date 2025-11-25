@@ -625,6 +625,8 @@ Return JSON: {{"verdict": "approve|reject|needs_modification",
 
 ### Phase 2B: Solver Refactoring Workflow (HITL Call Site Updates)
 
+**Status**: ✅ **Demonstrated** in notebook cells 66-67
+
 **Goal**: After creating specialized functions, systematically refactor 1000+ solver calls to use type-safe variants.
 
 **Complete Pipeline** (cell 63):
