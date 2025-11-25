@@ -185,6 +185,64 @@ Which file to tackle first? Recommend: `constants.py` (simplest), `arc_types.py`
 - **Status:** ✅ Tested and validated - notebook cleaned up (50+ obsolete cells removed)
 - **Next:** Scale to full 400 solver functions, deploy to Cloud Run
 
+**Phase 2: HITL Solver Refactoring** ⏳ READY TO EXECUTE
+
+Replace generic function calls in `solvers.py` with specialized versions using human-in-the-loop approval.
+
+**Goal:** Refactor solver functions to use specialized variants instead of generic DSL functions.
+
+**Example Transformation:**
+```python
+# Before: Generic call
+def solve_puzzle(grid):
+    return last(filter_color(grid, 'red'))
+
+# After: Specialized call
+def solve_puzzle(grid):
+    return last_object(filter_color(grid, 'red'))
+```
+
+**Workflow:** `refactor_solver_calls_hitl(generic_func, specialized_funcs, batch_size=5)`
+
+**Current Targets:**
+- `last()` → 17 instances → ['last_element', 'last_grid', 'last_object']
+- `first()` → 23 instances → ['first_element', 'first_grid', 'first_object']
+- `add()` → 51 instances → ['add_integer', 'add_grid', 'add_object']
+- **Total:** 91 refactorings across 20 HITL sessions
+
+**Process Flow:**
+1. **Detection:** Parse solvers.py for generic function calls
+2. **Analysis:** Determine appropriate specialized variant
+3. **HITL Review:** Display context + proposal → Human approves/rejects/selects
+4. **Application:** Apply approved changes with backup
+5. **Validation:** Run pytest (160 test baseline)
+6. **Decision:** Commit or rollback based on results
+
+**Success Metrics:**
+- ✅ All 160 baseline tests continue passing
+- ✅ Type safety improved (fewer Any types)
+- 🎯 Approval rate: >70%
+- 🔄 Rollback rate: <5%
+
+**Execution Strategy:**
+```python
+# Session 1: Pilot with last() (3-5 changes)
+refactor_solver_calls_hitl('last', ['last_element', 'last_grid', 'last_object'], batch_size=3)
+
+# Sessions 2-4: Complete last() (remaining 12-14 changes)
+# Sessions 5-9: Process first() (23 changes)
+# Sessions 10-20: Process add() (51 changes)
+```
+
+**Documentation Requirements (after Phase 2 completion):**
+- [ ] README.md: Add Phase 2 workflow example
+- [ ] KAGGLE_WRITEUP.md: Document refactoring results/metrics
+- [ ] PROJECT_STATUS.md: Mark Phase 2 complete, update statistics
+- [ ] architecture-arcDslRefactoringAgent.md: Add solver refactoring agent
+- [ ] progress-arcDslRefactoringAgent.md: Add Phase 2 milestone
+
+**Status:** Workflow implemented in notebook cell 63, ready for execution
+
 ### 3. Scoring maximization
 
 Ensure hitting all criteria:
