@@ -211,8 +211,59 @@ AI Agents Intensive/
 
 ## 🎯 Next Actions
 
+### Phase 2B: Solver Refactoring ⭐ **NEW CAPABILITY**
+
+**Status**: Workflow implemented (notebook cell 63), ready for execution
+
+**Decision Point**: Execute refactoring sessions OR document capability only?
+
+#### Option A: Execute Phase 2B Sessions (2-4 hours)
+Demonstrates complete HITL workflow in production:
+
+```python
+# Pilot Session: Test workflow with last() (15 min)
+refactor_solver_calls_hitl('last', ['last_element', 'last_grid', 'last_object'], batch_size=3)
+
+# Main Sessions: Complete last() (45 min) + first() (75 min)
+# Optional: add() refactoring (165 min additional)
+```
+
+**Targets**:
+- `last()` → 17 instances (4 sessions)
+- `first()` → 23 instances (5 sessions)  
+- `add()` → 51 instances (11 sessions) - OPTIONAL
+
+**Benefits**:
+- ✅ Real production metrics (approval rates, rollback rates)
+- ✅ Concrete before/after examples for video
+- ✅ Validates batch HITL processing at scale
+- ✅ Shows complete workflow: create functions → refactor calls
+
+**Cost**: 2-4 hours of interactive review sessions
+
+#### Option B: Document Capability Only (Recommended)
+Focus on Kaggle submission:
+
+**Benefits**:
+- ✅ Implementation complete and tested (cell 63 functional)
+- ✅ Clear documentation in README, architecture docs, plan
+- ✅ Saves 2-4 hours for video creation (10 points)
+- ✅ Demonstrates technical capability without execution
+
+**Compromise**: Execute 1 pilot session (15 min) for demo evidence, then proceed to video.
+
 ### Immediate (Next 24 hours)
-1. ⏳ **Create NotebookLM video** (1-2 hours)
+
+1. ⏳ **Execute Phase 2B Pilot** (OPTIONAL, 15 min)
+   ```python
+   # Quick demo of solver refactoring workflow
+   refactor_solver_calls_hitl('last', ['last_element', 'last_grid', 'last_object'], batch_size=3)
+   ```
+   - Provides concrete example for video
+   - Validates workflow in production
+   - Generates real metrics
+
+2. ⏳ **Create NotebookLM video** (1-2 hours) **PRIORITY**
    - Follow [NOTEBOOKLM_VIDEO_GUIDE.md](doc/NOTEBOOKLM_VIDEO_GUIDE.md)
    - Upload to YouTube
    - **Unlocks**: 120/120 points

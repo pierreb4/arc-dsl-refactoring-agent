@@ -143,6 +143,45 @@ Domain experts review ADK-approved proposals and provide feedback for rejected o
 - **Maintainability**: Specialized functions are easier to understand and debug
 - **Scalability**: Automated workflow handles 200+ opportunities
 
+### Phase 2B: Solver Refactoring (Next Step)
+
+**Current Status**: Workflow implemented, ready for execution
+
+After creating specialized functions, the next phase systematically refactors 1000+ solver calls to use type-safe variants:
+
+**Targets Identified**:
+- `last()` → 17 instances → Specialized variants: `last_element`, `last_grid`, `last_object`
+- `first()` → 23 instances → Specialized variants: `first_element`, `first_grid`, `first_object`  
+- `add()` → 51 instances → Specialized variants: `add_integer`, `add_grid`, `add_object`
+- **Total**: 91 refactorings across ~20 HITL sessions
+
+**Workflow** (`refactor_solver_calls_hitl` - Notebook cell 63):
+1. **Detection**: Parse solvers.py for all calls to generic function
+2. **Analysis**: Determine appropriate specialized variant per call
+3. **HITL Review**: Display context (7 lines), recommendation → Human approves/rejects/selects
+4. **Application**: Apply approved changes with automatic backup
+5. **Validation**: Run pytest (160 tests) with auto-rollback on failure
+6. **Decision**: Commit or rollback based on test results
+
+**Example Transformation**:
+```python
+# Before (line 42 in solve_0934a4d8):
+x1 = hsplit(I, THREE)           # Returns FrozenSet[Grid]
+O = last(x1)                     # Returns Any - type info lost
+
+# After (specialized):
+x1 = hsplit(I, THREE)            # Returns FrozenSet[Grid]
+O = last_grid(x1)                # Returns Grid - full type safety
+```
+
+**Benefits**:
+- ✅ Type safety at call sites (Grid → Grid instead of Any → Any)
+- ✅ IDE autocomplete and type checking enabled
+- ✅ Zero changes to existing generic functions (backward compatible)
+- ✅ Validation ensures no regressions
+
+**Innovation**: Batch HITL processing with context display, confidence scoring, and automatic validation makes large-scale refactoring practical.
+
 ---
 
 ## Key Concepts Demonstrated (8/8)

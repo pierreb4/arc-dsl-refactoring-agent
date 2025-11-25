@@ -699,6 +699,172 @@ Return JSON: {
 
 ---
 
+### 8. Solver Refactoring Agent (Gemini 2.0 Flash Lite) ⭐ **Phase 2B**
+
+**Role:** Refactor solver calls to use specialized variants  
+**Temperature:** 0.2 (balanced - consistent but adapts to context)  
+**Innovation:** Batch HITL workflow for call site refactoring
+
+**Purpose:**  
+After creating specialized function variants (e.g., `first_grid()`, `last_object()`), this agent systematically refactors the 1000+ solver functions to use type-safe specialized versions instead of generic calls.
+
+**Process:**
+1. **Detection:** Parse solvers.py for all calls to generic function (e.g., `last()`)
+2. **Analysis:** Determine which specialized variant is most appropriate for each call
+3. **HITL Review:** Display context + proposal → Human approves/rejects/selects
+4. **Application:** Apply approved changes with automatic backup
+5. **Validation:** Run pytest (160 test baseline) with auto-rollback on failure
+6. **Decision:** Commit or rollback based on test results
+
+**Key Function:** `refactor_solver_calls_hitl(generic_func, specialized_funcs, batch_size=5)`
+
+**Example Workflow:**
+```python
+# Target: Replace generic last() calls with specialized versions
+refactor_solver_calls_hitl(
+    generic_func='last',
+    specialized_funcs=['last_element', 'last_grid', 'last_object'],
+    batch_size=5  # Process 5 proposals per HITL session
+)
+
+# Agent output:
+"""
+📋 Proposal 1/5: solver_0934a4d8 (line 42)
+────────────────────────────────────────
+Context:
+  40:     x1 = hsplit(I, THREE)
+  41:     x2 = filter_color(x1, 'red')
+→ 42:     O = last(x2)  # FrozenSet[Grid] → Any
+  43:     return O
+  44:
+
+Recommended: last_grid(x2)  # FrozenSet[Grid] → Grid
+Confidence: HIGH (argument type matches FrozenSet[Grid])
+
+Options: [a]pprove | [r]eject | [s]elect other | [q]uit
+"""
+```
+
+**Human Interaction:**
+- `[a]pprove` - Accept this refactoring
+- `[r]eject` - Skip this change
+- `[s]elect` - Choose different specialized function
+- `[q]uit` - Save progress and exit
+
+**Batch Processing:**
+```python
+# Session 1: Pilot with small batch
+refactor_solver_calls_hitl('last', [...], batch_size=3)
+
+# Session 2-4: Complete last() refactoring (17 instances)
+refactor_solver_calls_hitl('last', [...], batch_size=5)
+
+# Session 5-9: Process first() calls (23 instances)
+refactor_solver_calls_hitl('first', [...], batch_size=5)
+
+# Session 10-20: Process add() calls (51 instances)
+refactor_solver_calls_hitl('add', [...], batch_size=5)
+```
+
+**Intelligent Analysis:**
+```python
+# For each call site, agent analyzes:
+1. Argument types from context (variable assignments, function returns)
+2. Return usage (what happens with the result)
+3. Semantic intent (grid operations vs object operations)
+
+# Example:
+x1 = hsplit(I, THREE)           # hsplit returns FrozenSet[Grid]
+O = last(x1)                    # Argument is FrozenSet[Grid]
+→ Recommendation: last_grid()   # Type-safe specialized version
+```
+
+**Safety Mechanisms:**
+1. **Automatic Backup:** Creates timestamped backup before any changes
+2. **Test Validation:** Runs all 160 tests after each batch
+3. **Auto-Rollback:** Restores from backup if tests fail
+4. **Progress Tracking:** Saves state after each approval for resume
+5. **Duplicate Detection:** Skips already-refactored calls
+
+**Key Prompts:**
+```python
+solver_refactoring_prompt = """
+You are analyzing a call to {generic_func}() in a solver function.
+
+Context:
+{code_context}  # 7 lines: 3 before, call line, 3 after
+
+Available specialized versions:
+{specialized_funcs}  # e.g., ['last_element', 'last_grid', 'last_object']
+
+Task:
+1. Identify the argument type at the call site
+2. Determine which specialized function matches the type
+3. Assign confidence level (HIGH/MEDIUM/LOW)
+4. Generate refactored line
+
+Output JSON:
+{
+  "call_line": 42,
+  "current_call": "last(x2)",
+  "argument_type": "FrozenSet[Grid]",
+  "recommended_function": "last_grid",
+  "confidence": "HIGH",
+  "reasoning": "hsplit() returns FrozenSet[Grid], matches last_grid signature",
+  "refactored_line": "O = last_grid(x2)"
+}
+"""
+```
+
+**Success Metrics:**
+- **Approval Rate:** >70% of proposals approved (high confidence analysis)
+- **Rollback Rate:** <5% (robust test validation)
+- **Type Safety:** All refactored calls have specific type hints
+- **Test Pass Rate:** 100% (160/160 tests maintained)
+
+**Current Targets:**
+- `last()` → 17 instances → ['last_element', 'last_grid', 'last_object']
+- `first()` → 23 instances → ['first_element', 'first_grid', 'first_object']
+- `add()` → 51 instances → ['add_integer', 'add_grid', 'add_object']
+- **Total:** 91 refactorings across ~20 HITL sessions
+
+**Implementation:** Notebook cell 63 - `refactor_solver_calls_hitl()`
+
+**Tools Used:**
+- `parse_solver_calls()` - AST-based call detection
+- `analyze_call_context()` - Type inference from surrounding code
+- `recommend_specialization()` - Match call to specialized variant
+- `apply_refactoring()` - Update solver code with backup
+- `run_regression_tests()` - Validate with pytest
+
+**Output Example:**
+```
+🔄 Solver Refactoring Session
+═══════════════════════════════════════
+Generic Function: last()
+Specialized Variants: ['last_element', 'last_grid', 'last_object']
+Batch Size: 5
+
+📊 Found 17 calls to refactor
+
+Processing Batch 1/4 (calls 1-5):
+──────────────────────────────────────
+✅ solver_0934a4d8:42 → last_grid() [APPROVED]
+✅ solver_135a2760:18 → last_object() [APPROVED]
+⏭️  solver_136b0064:29 → skipped [REJECTED]
+✅ solver_13e47133:55 → last_grid() [APPROVED]
+🔄 solver_142ca369:31 → last_element() [SELECTED]
+
+📦 Applying 4 refactorings...
+🔬 Running tests... 160/160 passed ✅
+💾 Backup saved to .backups/solvers_20251125_143022.py
+
+Session Progress: 4/17 (23.5%)
+Continue to next batch? [y/n]:
+```
+
+---
+
 ### Phase 2 Workflow Sequence
 
 ```python

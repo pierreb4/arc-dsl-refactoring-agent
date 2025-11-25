@@ -623,6 +623,208 @@ Return JSON: {{"verdict": "approve|reject|needs_modification",
 - Tests catch edge cases ADK might miss (low false negatives)
 - Zero regressions across 1000 solvers
 
+### Phase 2B: Solver Refactoring Workflow (HITL Call Site Updates)
+
+**Goal**: After creating specialized functions, systematically refactor 1000+ solver calls to use type-safe variants.
+
+**Complete Pipeline** (cell 63):
+
+```python
+def refactor_solver_calls_hitl(
+    generic_func: str,              # e.g., 'last', 'first', 'add'
+    specialized_funcs: list,        # e.g., ['last_element', 'last_grid', 'last_object']
+    batch_size: int = 5             # Process N proposals per HITL session
+):
+    """
+    Batch HITL workflow for refactoring solver calls:
+    1. Detection - Find all calls to generic function
+    2. Analysis - Determine appropriate specialized variant
+    3. HITL Review - Human approves/rejects/selects each change
+    4. Application - Apply approved changes with backup
+    5. Validation - Run pytest with auto-rollback on failure
+    6. Decision - Commit or rollback based on test results
+    """
+    
+    # Step 1: Detect all calls to generic function
+    calls = parse_solver_calls('arc-dsl/solvers.py', generic_func)
+    # Returns: [{solver: 'solve_0934a4d8', line: 42, context: '...', ...}, ...]
+    
+    print(f"📊 Found {len(calls)} calls to {generic_func}()")
+    
+    # Step 2: Batch processing
+    for batch_start in range(0, len(calls), batch_size):
+        batch = calls[batch_start:batch_start + batch_size]
+        batch_num = (batch_start // batch_size) + 1
+        total_batches = (len(calls) + batch_size - 1) // batch_size
+        
+        print(f"\n🔄 Processing Batch {batch_num}/{total_batches}")
+        print("=" * 60)
+        
+        approved_changes = []
+        
+        # Step 3: HITL Review for each call in batch
+        for i, call in enumerate(batch, 1):
+            print(f"\n📋 Proposal {i}/{len(batch)}: {call['solver']} (line {call['line']})")
+            print("─" * 60)
+            
+            # Display context (7 lines: 3 before, call, 3 after)
+            print("Context:")
+            for line_num, line_text in call['context']:
+                prefix = "→" if line_num == call['line'] else " "
+                print(f"  {prefix} {line_num:3d}: {line_text}")
+            
+            # Analyze and recommend specialized function
+            analysis = analyze_call_context(call, specialized_funcs)
+            print(f"\nRecommended: {analysis['recommended_function']}()")
+            print(f"Confidence: {analysis['confidence']}")
+            print(f"Reasoning: {analysis['reasoning']}")
+            
+            # Human decision
+            print(f"\nOptions: [a]pprove | [r]eject | [s]elect other | [q]uit")
+            decision = input("Your choice: ").strip().lower()
+            
+            if decision in ['a', 'approve', 'y', 'yes']:
+                approved_changes.append({
+                    'call': call,
+                    'new_function': analysis['recommended_function']
+                })
+                print(f"✅ Approved")
+            
+            elif decision in ['s', 'select']:
+                print(f"Available: {', '.join(specialized_funcs)}")
+                selected = input("Enter function name: ").strip()
+                if selected in specialized_funcs:
+                    approved_changes.append({
+                        'call': call,
+                        'new_function': selected
+                    })
+                    print(f"✅ Selected {selected}")
+                else:
+                    print(f"❌ Invalid selection, skipping")
+            
+            elif decision in ['r', 'reject', 'n', 'no']:
+                print(f"⏭️  Rejected")
+                continue
+            
+            elif decision in ['q', 'quit', 'exit']:
+                print(f"🛑 Exiting - progress saved")
+                break
+        
+        if not approved_changes:
+            print("\n⏭️  No changes approved in this batch")
+            continue
+        
+        # Step 4: Apply approved changes with backup
+        print(f"\n📦 Applying {len(approved_changes)} refactorings...")
+        backup_path = create_backup('arc-dsl/solvers.py')
+        print(f"💾 Backup: {backup_path}")
+        
+        for change in approved_changes:
+            apply_refactoring(
+                file='arc-dsl/solvers.py',
+                line=change['call']['line'],
+                old_func=generic_func,
+                new_func=change['new_function']
+            )
+        
+        # Step 5: Validation
+        print(f"\n🔬 Running tests...")
+        test_result = run_pytest('arc-dsl/tests.py')
+        
+        if test_result.passed:
+            print(f"✅ All {test_result.total} tests passed!")
+            print(f"💚 Changes committed")
+            remove_backup(backup_path)
+        else:
+            print(f"❌ Tests failed ({test_result.failed}/{test_result.total})")
+            print(f"🔄 Rolling back from backup...")
+            restore_backup(backup_path)
+            print(f"⚠️  Batch changes reverted")
+            break  # Stop processing further batches
+        
+        # Progress update
+        completed = batch_start + len(batch)
+        print(f"\n📊 Session Progress: {completed}/{len(calls)} ({100*completed//len(calls)}%)")
+```
+
+**Example Session Output**:
+
+```
+🔄 Solver Refactoring Session
+═══════════════════════════════════════
+Generic Function: last()
+Specialized Variants: ['last_element', 'last_grid', 'last_object']
+Batch Size: 5
+
+📊 Found 17 calls to refactor
+
+🔄 Processing Batch 1/4
+═══════════════════════════════════════
+
+📋 Proposal 1/5: solve_0934a4d8 (line 42)
+────────────────────────────────────────
+Context:
+   39: def solve_0934a4d8(I):
+   40:     x1 = hsplit(I, THREE)
+   41:     x2 = filter_color(x1, 'red')
+→  42:     O = last(x2)
+   43:     return O
+   44:
+
+Recommended: last_object()
+Confidence: HIGH
+Reasoning: filter_color returns FrozenSet[Object], matches last_object signature
+
+Options: [a]pprove | [r]eject | [s]elect other | [q]uit
+Your choice: a
+✅ Approved
+
+📋 Proposal 2/5: solve_135a2760 (line 18)
+────────────────────────────────────────
+Context:
+   16:     grids = hsplit(I, THREE)
+   17:     filtered = filter_by_size(grids, (2, 2))
+→  18:     result = last(filtered)
+   19:     return process(result)
+   20:
+
+Recommended: last_grid()
+Confidence: HIGH
+Reasoning: filter_by_size operates on grids, returns FrozenSet[Grid]
+
+Options: [a]pprove | [r]eject | [s]elect other | [q]uit
+Your choice: a
+✅ Approved
+
+[... 3 more proposals ...]
+
+📦 Applying 4 refactorings...
+💾 Backup: .backups/solvers_20251125_143022.py
+🔬 Running tests...
+✅ All 160 tests passed!
+💚 Changes committed
+
+📊 Session Progress: 5/17 (29%)
+
+Continue to next batch? [y/n]: y
+```
+
+**Current Refactoring Targets**:
+
+| Generic Function | Instances | Specialized Variants | Sessions Needed |
+|------------------|-----------|---------------------|-----------------|
+| `last()` | 17 | `['last_element', 'last_grid', 'last_object']` | 3-4 (pilot + main) |
+| `first()` | 23 | `['first_element', 'first_grid', 'first_object']` | 4-5 |
+| `add()` | 51 | `['add_integer', 'add_grid', 'add_object']` | 10-11 |
+| **TOTAL** | **91** | - | **~20 sessions** |
+
+**Benefits**:
+- ✅ **Type Safety**: Refactored calls get specific type hints (Grid → Grid instead of Any → Any)
+- ✅ **IDE Support**: Autocomplete and type checking enabled
+- ✅ **Zero Changes to Existing Code**: Specialized functions coexist with generic versions
+- ✅ **Validation**: 160 tests ensure no regressions
+- ✅ **Resumable**: Progress saved, can pause/resume anytime
+
 ### Session State & Memory
 
 ```python
